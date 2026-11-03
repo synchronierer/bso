@@ -96,7 +96,9 @@ public class DemoApi {
         if (equivalent != null && equivalent > 0)
             throw bad("Eine gleichartige Wahlpflichtgruppe wurde in diesem Schuljahr bereits gewertet");
         try {
-            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by) VALUES (?,?,?,?)",g.studentPk(),g.eventId(),g.coins(),auth.getName());
+            Integer studentGrade=db.queryForObject("SELECT grade FROM students WHERE id=? AND active=true",Integer.class,g.studentPk());
+            if(studentGrade==null) throw bad("Schüler nicht vorhanden oder archiviert");
+            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade) VALUES (?,?,?,?,?)",g.studentPk(),g.eventId(),g.coins(),auth.getName(),studentGrade);
             if(changed!=1) throw bad("Buchung fehlgeschlagen");
             audit(auth,"COIN_GRANT", "student", Long.toString(g.studentPk()), null, g.coins().toPlainString());
         } catch(DataIntegrityViolationException ex) { throw bad("Schüler nicht vorhanden oder Veranstaltung schon verbucht"); }

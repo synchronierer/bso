@@ -14,6 +14,9 @@ public final class CoinRules {
         Map.entry("9|BR", new Thresholds("128", "151", "171")),
         Map.entry("9|V10/S1/Ü11", new Thresholds("24", "47", "67")),
         Map.entry("10|S1/Ü11", new Thresholds("40", "70", "97")),
+        Map.entry("10|V10/S1/Ü11", new Thresholds("40", "70", "97")),
+        Map.entry("10|S1", new Thresholds("40", "70", "97")),
+        Map.entry("10|Ü11", new Thresholds("40", "70", "97")),
         Map.entry("11|MSS", new Thresholds("116", "137", "153")),
         Map.entry("12|MSS", new Thresholds("132", "160", "183"))
     );
@@ -38,7 +41,7 @@ public final class CoinRules {
 
     public static Level levelFor(BigDecimal total, int grade, String track) {
         if (grade == 13) return Level.NONE;
-        Thresholds t = THRESHOLDS.get(grade + "|" + track);
+        Thresholds t = THRESHOLDS.get(grade + "|" + normalizedTrack(track));
         if (t == null) return Level.REVIEW_REQUIRED;
         Objects.requireNonNull(total, "total");
         if (total.compareTo(t.distinction()) >= 0) return Level.DISTINCTION;
@@ -48,12 +51,20 @@ public final class CoinRules {
     }
 
     public static BigDecimal nextThresholdDistance(BigDecimal total, int grade, String track) {
-        Thresholds t = THRESHOLDS.get(grade + "|" + track);
+        Thresholds t = THRESHOLDS.get(grade + "|" + normalizedTrack(track));
         if (t == null || grade == 13) return null;
         for (BigDecimal threshold : new BigDecimal[]{t.success(), t.specialSuccess(), t.distinction()}) {
             if (total.compareTo(threshold) < 0) return threshold.subtract(total).setScale(1, RoundingMode.UNNECESSARY);
         }
         return BigDecimal.ZERO.setScale(1);
+    }
+
+    private static String normalizedTrack(String track) {
+        if (track == null) return "";
+        return switch (track.trim().toUpperCase()) {
+            case "V10", "S1", "Ü11", "U11", "V10/S1", "V10/S1/U11" -> "V10/S1/Ü11";
+            default -> track.trim();
+        };
     }
 
     public enum Block { SEK_I, OBERSTUFE }

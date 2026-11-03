@@ -28,4 +28,18 @@ class CoinRulesTest {
         assertThrows(IllegalArgumentException.class,
             () -> CoinRules.requireCoinValue(new BigDecimal("0"), false));
     }
+
+    @Test void allPublishedBoundaryCasesRemainLueckenlos() {
+        assertEquals(CoinRules.Level.NONE, CoinRules.levelFor(new BigDecimal("39.5"),10,"S1"));
+        assertEquals(CoinRules.Level.SUCCESS, CoinRules.levelFor(new BigDecimal("40"),10,"S1"));
+        assertEquals(CoinRules.Level.NONE, CoinRules.levelFor(new BigDecimal("131.5"),12,"MSS"));
+        assertEquals(CoinRules.Level.SUCCESS, CoinRules.levelFor(new BigDecimal("132"),12,"MSS"));
+        assertEquals(new BigDecimal("0.5"), CoinRules.nextThresholdDistance(new BigDecimal("127.5"),9,"BR"));
+    }
+
+    @Test void trackAliasesUseTheSamePublishedRule() {
+        assertEquals(CoinRules.Level.SUCCESS, CoinRules.levelFor(new BigDecimal("10"),8,"V10"));
+        assertEquals(CoinRules.Level.SUCCESS, CoinRules.levelFor(new BigDecimal("10"),8,"S1"));
+        assertEquals(CoinRules.Level.REVIEW_REQUIRED, CoinRules.levelFor(new BigDecimal("100"),10,"BR"));
+    }
 }

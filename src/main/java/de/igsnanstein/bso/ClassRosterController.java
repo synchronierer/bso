@@ -81,8 +81,10 @@ public class ClassRosterController {
         }
         try {
             for(Assignment a:chosen) {
-                db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by) VALUES(?,?,?,?)",
-                    a.studentPk(),b.eventId(),a.coins(),auth.getName());
+                db.update("""
+                    INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade)
+                    SELECT ?,?,?,?,grade FROM students WHERE id=? AND active=true""",
+                    a.studentPk(),b.eventId(),a.coins(),auth.getName(),a.studentPk());
             }
         } catch (DataIntegrityViolationException ex) {
             throw bad("Die Buchung wurde parallel verändert; Raster bitte neu laden");

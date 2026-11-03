@@ -22,7 +22,7 @@ public class CsvImportController {
     private final JdbcTemplate db;
     CsvImportController(JdbcTemplate db){this.db=db;}
 
-    record CsvRequest(String csv){}
+    record CsvRequest(String csv, Boolean confirmHighValue){}
     record Preview(List<Map<String,Object>> rows,int added,int updated,int unchanged,int errors){}
     private record Row(String action, Map<String,Object> data, String error){}
 
@@ -63,6 +63,8 @@ public class CsvImportController {
     public Map<String,Object> importEvents(@RequestBody CsvRequest request){
         Preview p=preview(request,"events");
         if(p.errors()>0) throw bad("Import enthält Fehler; zuerst korrigieren");
+        if(p.rows().stream().anyMatch(row -> row.containsKey("warning")) && !Boolean.TRUE.equals(request.confirmHighValue()))
+            throw bad("Veranstaltungen über 20 Münzen benötigen eine ausdrückliche Bestätigung");
         int changed=0;
         for(Map<String,Object> r:p.rows()){
             if(!"ADD".equals(r.get("action")))continue;
@@ -126,7 +128,7 @@ public class CsvImportController {
                         if(coins.compareTo(new BigDecimal("0.5"))<0 || coins.remainder(new BigDecimal("0.5")).signum()!=0)
                             throw new IllegalArgumentException("Münzwert nur in 0,5er-Schritten ab 0,5");
                         if(coins.compareTo(new BigDecimal("20"))>0)
-                            throw new IllegalArgumentException("Über 20 Münzen: erst einzeln prüfen und bestätigen");
+                            row.put("warning","Über 20 Münzen – bestätigungspflichtig");
                         String key=title+"|"+end;
                         if(!keys.add(key))throw new IllegalArgumentException("Doppelte Veranstaltung in CSV");
                         row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());
