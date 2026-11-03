@@ -29,7 +29,8 @@ public class ClassRosterController {
         List<Map<String,Object>> students=db.queryForList("""
             SELECT s.id,s.first_name AS "firstName",s.last_name AS "lastName",
             s.student_id AS "studentId",g.coins AS "alreadyGranted"
-            FROM students s LEFT JOIN coin_grants g ON g.student_pk=s.id AND g.event_id=?
+            FROM students s LEFT JOIN enrollment_episodes ep ON ep.student_pk=s.id AND ep.ends_on IS NULL
+            LEFT JOIN coin_grants g ON g.student_pk=s.id AND g.episode_id=ep.id AND g.event_id=?
             WHERE s.class_name=? ORDER BY s.last_name,s.first_name,s.id
             """,eventId,className);
         List<Map<String,Object>> drafts=db.queryForList(
@@ -82,9 +83,9 @@ public class ClassRosterController {
         try {
             for(Assignment a:chosen) {
                 db.update("""
-                    INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade)
-                    SELECT ?,?,?,?,grade FROM students WHERE id=? AND active=true""",
-                    a.studentPk(),b.eventId(),a.coins(),auth.getName(),a.studentPk());
+                    INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade,episode_id)
+                    SELECT s.id,?,?,?,s.grade,ep.id FROM students s JOIN enrollment_episodes ep ON ep.student_pk=s.id AND ep.ends_on IS NULL WHERE s.id=? AND s.active=true""",
+                    b.eventId(),a.coins(),auth.getName(),a.studentPk());
             }
         } catch (DataIntegrityViolationException ex) {
             throw bad("Die Buchung wurde parallel verändert; Raster bitte neu laden");

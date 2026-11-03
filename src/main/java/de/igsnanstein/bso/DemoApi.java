@@ -33,7 +33,8 @@ public class DemoApi {
             COALESCE(SUM(CASE WHEN (s.grade <= 10 AND EXTRACT(YEAR FROM e.end_date) < 9999)
                OR s.grade >= 11 THEN g.coins ELSE 0 END),0) AS coins
           FROM students s
-          LEFT JOIN coin_grants g ON g.student_pk=s.id
+          LEFT JOIN enrollment_episodes current_episode ON current_episode.student_pk=s.id AND current_episode.ends_on IS NULL
+          LEFT JOIN coin_grants g ON g.student_pk=s.id AND g.episode_id=current_episode.id
           LEFT JOIN events e ON e.id=g.event_id
           GROUP BY s.id ORDER BY s.class_name,s.last_name,s.first_name
           """);
@@ -91,14 +92,17 @@ public class DemoApi {
             JOIN event_equivalences old_eq ON old_eq.event_id=old_event.id
             JOIN event_equivalences new_eq ON new_eq.group_id=old_eq.group_id
             WHERE old_grant.student_pk=? AND new_eq.event_id=?
+              AND old_grant.episode_id=(SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1)
               AND EXTRACT(YEAR FROM old_event.end_date)=EXTRACT(YEAR FROM CAST(? AS DATE))
-            """, Integer.class, g.studentPk(), g.eventId(), end);
+            """, Integer.class, g.studentPk(), g.eventId(), g.studentPk(), end);
         if (equivalent != null && equivalent > 0)
             throw bad("Eine gleichartige Wahlpflichtgruppe wurde in diesem Schuljahr bereits gewertet");
         try {
             Integer studentGrade=db.queryForObject("SELECT grade FROM students WHERE id=? AND active=true",Integer.class,g.studentPk());
             if(studentGrade==null) throw bad("Schüler nicht vorhanden oder archiviert");
-            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade) VALUES (?,?,?,?,?)",g.studentPk(),g.eventId(),g.coins(),auth.getName(),studentGrade);
+            Long episode=db.queryForObject("SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1",Long.class,g.studentPk());
+            if(episode==null) throw bad("Schüler hat keine offene Schulbesuchsepisode");
+            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade,episode_id) VALUES (?,?,?,?,?,?)",g.studentPk(),g.eventId(),g.coins(),auth.getName(),studentGrade,episode);
             if(changed!=1) throw bad("Buchung fehlgeschlagen");
             audit(auth,"COIN_GRANT", "student", Long.toString(g.studentPk()), null, g.coins().toPlainString());
         } catch(DataIntegrityViolationException ex) { throw bad("Schüler nicht vorhanden oder Veranstaltung schon verbucht"); }

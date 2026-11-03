@@ -67,15 +67,15 @@ public class CertificateService {
         return rows.get(0);
     }
     private BigDecimal coinTotal(long pk,LocalDate asOf) {
-        BigDecimal value=db.queryForObject("SELECT COALESCE(SUM(g.coins),0) FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.student_pk=? AND g.excluded=false AND e.end_date<=? AND e.status<>'ABGEBROCHEN'",BigDecimal.class,pk,asOf);
+        BigDecimal value=db.queryForObject("SELECT COALESCE(SUM(g.coins),0) FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND g.excluded=false AND e.end_date<=? AND e.status<>'ABGEBROCHEN'",BigDecimal.class,pk,asOf,asOf,asOf);
         return value==null?BigDecimal.ZERO:value;
     }
     private BigDecimal internshipTotal(long pk,LocalDate asOf) {
-        BigDecimal value=db.queryForObject("SELECT COALESCE(SUM(coins),0) FROM internships WHERE student_pk=? AND finalised=true AND ends_on<=?",BigDecimal.class,pk,asOf);
+        BigDecimal value=db.queryForObject("SELECT COALESCE(SUM(i.coins),0) FROM internships i WHERE i.episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND i.finalised=true AND i.ends_on<=?",BigDecimal.class,pk,asOf,asOf,asOf);
         return value==null?BigDecimal.ZERO:value;
     }
-    private List<Map<String,Object>> events(long pk,LocalDate asOf) { return db.queryForList("SELECT e.title,e.end_date,g.coins FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.student_pk=? AND e.end_date<=? ORDER BY e.end_date,e.title",pk,asOf); }
-    private List<Map<String,Object>> internships(long pk,LocalDate asOf) { return db.queryForList("SELECT kind,company,starts_on,ends_on,recognized_days,coins FROM internships WHERE student_pk=? AND finalised=true AND ends_on<=? ORDER BY starts_on",pk,asOf); }
+    private List<Map<String,Object>> events(long pk,LocalDate asOf) { return db.queryForList("SELECT e.title,e.end_date,g.coins FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND e.end_date<=? ORDER BY e.end_date,e.title",pk,asOf,asOf,asOf); }
+    private List<Map<String,Object>> internships(long pk,LocalDate asOf) { return db.queryForList("SELECT kind,company,starts_on,ends_on,recognized_days,coins FROM internships WHERE episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND finalised=true AND ends_on<=? ORDER BY starts_on",pk,asOf,asOf,asOf); }
 
     private byte[] pdf(Map<String,Object> student,Map<String,Object> payload,LocalDate asOf,BigDecimal coins,CoinRules.Level level) {
         try(PDDocument document=new PDDocument(); ByteArrayOutputStream out=new ByteArrayOutputStream()) {

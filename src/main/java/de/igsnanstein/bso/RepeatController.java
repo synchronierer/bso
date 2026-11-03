@@ -25,7 +25,7 @@ public class RepeatController {
         if(student!=1) throw bad("Schüler nicht vorhanden oder archiviert");
         db.update("UPDATE repeat_decisions SET active=false WHERE student_pk=? AND repeated_grade=? AND active=true",studentPk,decision.repeatedGrade());
         db.update("INSERT INTO repeat_decisions(student_pk,repeated_grade,effective_on,decided_by) VALUES(?,?,?,?)",studentPk,decision.repeatedGrade(),date,auth.getName());
-        int excluded=db.update("UPDATE coin_grants SET excluded=true,exclusion_reason='UNGUELTIG_WIEDERHOLUNG' WHERE student_pk=? AND student_grade=? AND excluded=false",studentPk,decision.repeatedGrade());
+        int excluded=db.update("UPDATE coin_grants SET excluded=true,exclusion_reason='UNGUELTIG_WIEDERHOLUNG' WHERE student_pk=? AND episode_id=(SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1) AND student_grade=? AND excluded=false",studentPk,studentPk,decision.repeatedGrade());
         db.update("UPDATE certificates SET status='UNGUELTIG_WIEDERHOLUNG' WHERE student_pk=? AND status='AKTUELL'",studentPk);
         audit(auth,"REPETITION_CONFIRM",studentPk,"{\"grade\":"+decision.repeatedGrade()+",\"excluded\":"+excluded+"}");
         return Map.of("message","Klassenwiederholung bestätigt","excludedGrants",excluded);
@@ -35,7 +35,7 @@ public class RepeatController {
     @Transactional
     public Map<String,Object> revoke(@PathVariable long studentPk,@PathVariable int grade,Authentication auth){
         int changed=db.update("UPDATE repeat_decisions SET active=false WHERE student_pk=? AND repeated_grade=? AND active=true",studentPk,grade);
-        int restored=db.update("UPDATE coin_grants SET excluded=false,exclusion_reason=null WHERE student_pk=? AND student_grade=? AND excluded=true AND exclusion_reason='UNGUELTIG_WIEDERHOLUNG'",studentPk,grade);
+        int restored=db.update("UPDATE coin_grants SET excluded=false,exclusion_reason=null WHERE student_pk=? AND episode_id=(SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1) AND student_grade=? AND excluded=true AND exclusion_reason='UNGUELTIG_WIEDERHOLUNG'",studentPk,studentPk,grade);
         db.update("UPDATE certificates SET status='AKTUELL' WHERE student_pk=? AND status='UNGUELTIG_WIEDERHOLUNG'",studentPk);
         audit(auth,"REPETITION_REVOKE",studentPk,"{\"grade\":"+grade+",\"restored\":"+restored+"}");
         return Map.of("message","Klassenwiederholung zurückgenommen","decisions",changed,"restoredGrants",restored);

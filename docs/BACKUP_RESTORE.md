@@ -21,8 +21,8 @@ Der PostgreSQL-Dump nutzt das Custom-Format, wird mit `umask 077` erstellt und n
 ## Restore-Test auf separater Instanz
 
 1. Eine frische PostgreSQL-Instanz in einer isolierten Testumgebung starten; niemals das Produktionsvolume ersetzen.
-2. `BSO_COMPOSE_DIR`, `BSO_BACKUP_FILE` und `CONFIRM_RESTORE=YES` nur in dieser Testumgebung setzen.
+2. `BSO_COMPOSE_DIR`, `BSO_BACKUP_FILE`, optional `BSO_FILES_BACKUP`, `BSO_STORAGE_DIR` und `CONFIRM_RESTORE=YES` nur in dieser Testumgebung setzen.
 3. `deploy/restore.sh` ausführen, anschließend `docker compose up -d` und `/api/health` sowie Login, Schülerhistorie, Zertifikatsversionen und Dateiablage prüfen.
 4. Das Ergebnis mit Datum, Backup-Hash und Prüfer im Betriebsprotokoll dokumentieren.
 
-`restore.sh` stoppt nur den BSO-Webdienst der Ziel-Compose-Datei und führt `pg_restore --clean` ausschließlich in der ausdrücklich ausgewählten Ziel-Datenbank aus. Es wird weder `docker compose down -v` verwendet noch ein fremder Container angesprochen.
+`restore.sh` stoppt nur den BSO-Webdienst der Ziel-Compose-Datei, führt `pg_restore --clean` ausschließlich in der ausdrücklich ausgewählten Ziel-Datenbank aus und entpackt ein optional angegebenes Datei-Backup ausschließlich nach `BSO_STORAGE_DIR`. Es wird weder `docker compose down -v` verwendet noch ein fremder Container angesprochen.

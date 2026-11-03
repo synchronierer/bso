@@ -36,8 +36,10 @@ public class InternshipController {
             if(schoolYear==null) throw bad("Kein Schuljahr für das Praktikumsende konfiguriert");
             int count=db.queryForObject("SELECT COUNT(*) FROM students WHERE id=? AND active=true",Integer.class,request.studentPk());
             if(count!=1) throw bad("Schüler nicht vorhanden oder archiviert");
-            int changed=db.update("INSERT INTO internships(student_pk,school_year_id,kind,company,starts_on,ends_on,recognized_days,coins,finalised,recorded_by) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                request.studentPk(),schoolYear,kind,request.company().trim(),starts,ends,request.recognizedDays(),coins,request.finalised(),auth.getName());
+            Long episode=db.queryForObject("SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1",Long.class,request.studentPk());
+            if(episode==null) throw bad("Schüler hat keine offene Schulbesuchsepisode");
+            int changed=db.update("INSERT INTO internships(student_pk,episode_id,school_year_id,kind,company,starts_on,ends_on,recognized_days,coins,finalised,recorded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                request.studentPk(),episode,schoolYear,kind,request.company().trim(),starts,ends,request.recognizedDays(),coins,request.finalised(),auth.getName());
             db.update("INSERT INTO audit_events(actor,action,object_type,object_id,before_json,after_json) VALUES (?,?,?, ?,CAST('null' AS JSONB),CAST(? AS JSONB))",
                 auth.getName(),"INTERNSHIP_CREATE","student",Long.toString(request.studentPk()),"{\"kind\":\""+kind+"\",\"coins\":"+coins+"}");
             return Map.of("message","Praktikum gespeichert","coins",coins,"changed",changed);

@@ -23,8 +23,8 @@ public class CertificateController {
     @GetMapping("/{studentPk}")
     public Map<String,Object> status(@PathVariable long studentPk,@RequestParam(defaultValue="") String asOf) {
         LocalDate date=date(asOf); Map<String,Object> student=db.queryForMap("SELECT id,student_id,first_name,last_name,class_name,grade,track FROM students WHERE id=? AND active=true",studentPk);
-        java.math.BigDecimal coins=db.queryForObject("SELECT COALESCE(SUM(g.coins),0) FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.student_pk=? AND g.excluded=false AND e.end_date<=?",java.math.BigDecimal.class,studentPk,date);
-        java.math.BigDecimal practice=db.queryForObject("SELECT COALESCE(SUM(coins),0) FROM internships WHERE student_pk=? AND finalised=true AND ends_on<=?",java.math.BigDecimal.class,studentPk,date);
+        java.math.BigDecimal coins=db.queryForObject("SELECT COALESCE(SUM(g.coins),0) FROM coin_grants g JOIN events e ON e.id=g.event_id WHERE g.episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND g.excluded=false AND e.end_date<=?",java.math.BigDecimal.class,studentPk,date,date,date);
+        java.math.BigDecimal practice=db.queryForObject("SELECT COALESCE(SUM(i.coins),0) FROM internships i WHERE i.episode_id=(SELECT ep.id FROM enrollment_episodes ep WHERE ep.student_pk=? AND ep.starts_on<=? AND (ep.ends_on IS NULL OR ep.ends_on>=?) ORDER BY ep.starts_on DESC,ep.id DESC LIMIT 1) AND i.finalised=true AND i.ends_on<=?",java.math.BigDecimal.class,studentPk,date,date,date);
         coins=coins.add(practice); int grade=((Number)student.get("grade")).intValue(); String track=(String)student.get("track");
         return Map.of("studentId",student.get("student_id"),"name",student.get("first_name")+" "+student.get("last_name"),"date",date.toString(),"coins",coins,"level",CoinRules.levelFor(coins,grade,track).name(),"nextDistance",String.valueOf(CoinRules.nextThresholdDistance(coins,grade,track)));
     }
