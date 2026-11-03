@@ -1,0 +1,56 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSO – Klassenraster</title><style>
+body{font:16px system-ui,Arial,sans-serif;background:#f4f7fb;color:#193047;max-width:1000px;margin:30px auto;padding:15px}
+section{background:white;padding:22px;border-radius:12px;margin:20px 0}button,select,input{font:inherit;padding:8px}
+button{background:#173756;color:white;border:0;border-radius:8px;cursor:pointer;margin:8px 8px 8px 0}
+button:disabled{opacity:.45}table{border-collapse:collapse;width:100%}td,th{padding:9px;border-bottom:1px solid #e0e6ee;text-align:left}
+input[type=number]{width:80px}.note{background:#fff3da;padding:12px;border-radius:8px}</style></head>
+<body><h1>Münzen klassenweise vergeben</h1><p><a href="/">Zur Übersicht</a></p>
+<p class="note"><strong>Demo:</strong> nur fiktive Daten; die vollständigen Prüfregeln für wiederholte Veranstaltungen, Praktika und Klassenwiederholungen fehlen noch.</p>
+<section><h2>1. Klasse und Veranstaltung auswählen</h2>
+<label>Klasse <select id="className"></select></label>
+<label>Veranstaltung <select id="eventId"></select></label>
+<button id="load">Klassenraster laden</button></section>
+<section id="grid" hidden><h2>2. Münzen auswählen</h2>
+<p><label><input id="all" type="checkbox"> Alle noch nicht verbuchten Schüler auswählen</label></p>
+<table><thead><tr><th>Auswahl</th><th>Schüler/in</th><th>ID</th><th>Münzen</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table>
+<p id="summary"></p>
+<button id="save">Entwurf speichern</button><button id="book">Münzen endgültig verbuchen</button>
+<p id="message" role="status"></p></section>
+<script>
+const $=id=>document.getElementById(id);let csrf='',students=[],standard=0,loaded=null,saveTimer;
+async function api(path,opts={}){opts.headers={...(opts.headers||{}),'X-XSRF-TOKEN':csrf};
+const r=await fetch('/api/'+path,opts);if(!r.ok){let m='HTTP '+r.status;try{let j=await r.json();m=j.detail||j.message||m}catch{}throw Error(m)}return r.json()}
+function choose(node,v,label){let o=document.createElement('option');o.value=v;o.textContent=label;node.append(o)}
+async function init(){csrf=(await api('csrf')).token;let [classes,events]=await Promise.all([api('roster/classes'),api('events')]);for(let c of classes)choose($('className'),c,c);for(let e of events)choose($('eventId'),e.id,e.title+' · '+e.endDate+' · '+e.coins+' Münzen')}
+function assignments(){return students.map(s=>({studentPk:s.id,selected:!!s.selected,coins:Number(s.coins)}))}
+function payload(){return {className:$('className').value,eventId:Number($('eventId').value),assignments:assignments()}}
+function scheduleSave(){clearTimeout(saveTimer);saveTimer=setTimeout(save,1200)}
+function summary(){const selected=students.filter(s=>s.selected);$('summary').textContent=selected.length+' ausgewählt · '+selected.reduce((a,s)=>a+Number(s.coins),0).toLocaleString('de-DE')+' Münzen'}
+async function load(){if(!$('className').value||!$('eventId').value)return;
+let data=await api('roster?className='+encodeURIComponent($('className').value)+'&eventId='+encodeURIComponent($('eventId').value));
+standard=Number(data.event.coins);
+let draft=[];
+try{draft=typeof data.draft==='string'?JSON.parse(data.draft):(Array.isArray(data.draft)?data.draft:[])}catch{}
+const lookup=new Map(draft.map(d=>[Number(d.studentPk),d]));
+students=data.students.map(s=>({...s,selected:!s.alreadyGranted && !!lookup.get(s.id)?.selected,
+coins:lookup.get(s.id)?.coins??standard}));
+loaded=true;$('grid').hidden=false;$('rows').replaceChildren();
+for(let s of students){let tr=document.createElement('tr'),td=document.createElement('td');
+let check=document.createElement('input');check.type='checkbox';check.checked=s.selected;check.disabled=s.alreadyGranted!==null;check.onchange=()=>{s.selected=check.checked;summary();scheduleSave()};
+td.append(check);tr.append(td);for(let value of [s.lastName+', '+s.firstName,s.studentId]){td=document.createElement('td');td.textContent=value;tr.append(td)}
+td=document.createElement('td');let number=document.createElement('input');number.type='number';number.min='0';number.step='0.5';number.max=String(standard);number.value=String(s.coins);number.disabled=s.alreadyGranted!==null;
+number.onchange=()=>{s.coins=Number(number.value);summary();scheduleSave()};td.append(number);tr.append(td);
+td=document.createElement('td');td.textContent=s.alreadyGranted!==null?'Bereits '+s.alreadyGranted+' Münzen verbucht':'Offen';tr.append(td);$('rows').append(tr)}
+summary();$('message').textContent='Raster bereit; Änderungen werden als Entwurf gespeichert.'}
+$('load').onclick=()=>load().catch(e=>$('message').textContent=e.message);
+$('all').onchange=()=>{for(let s of students)if(s.alreadyGranted===null)s.selected=$('all').checked;loadCheckState();summary();scheduleSave()};
+function loadCheckState(){let inputs=$('rows').querySelectorAll('input[type=checkbox]');students.forEach((s,i)=>inputs[i].checked=s.selected)}
+async function save(){if(!loaded)return;try{await api('roster/draft',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload())});$('message').textContent='Entwurf automatisch gespeichert.'}catch(e){$('message').textContent='Entwurf konnte nicht gespeichert werden: '+e.message}}
+$('save').onclick=save;
+$('book').onclick=async()=>{clearTimeout(saveTimer);let chosen=students.filter(s=>s.selected);if(!chosen.length){$('message').textContent='Bitte Schüler auswählen';return}
+if(!confirm('Münzen für '+chosen.length+' Personen endgültig verbuchen?'))return;
+try{let r=await api('roster/confirm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload())});$('message').textContent=r.message;await load()}
+catch(e){$('message').textContent='Buchung fehlgeschlagen: '+e.message}};
+init().catch(e=>$('message').textContent=e.message);
+</script></body></html>
