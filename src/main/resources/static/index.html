@@ -15,9 +15,9 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 #notice{padding:10px;min-height:20px}
 </style></head><body>
 <header><h1>BSO-Münzverwaltung</h1><p>Integrierte Gesamtschule Am Nanstein · Technische Demoversion</p></header>
-<div class="warning"><strong>Nur Demo:</strong> Anmeldung vorhanden, aber noch kein HTTPS und keine vollständigen BSO-Sonderregeln. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
+<div class="warning"><strong>RC1-Testbetrieb:</strong> Die fachliche, technische und datenschutzrechtliche Freigabe für Echtdaten steht noch aus. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
 <nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-<span id="signedIn"></span><a href="/import.html">CSV/XLSX-Import</a><a href="/roster.html">Klassenraster</a><a href="#studentSelect">Zertifikate über Schülerauswahl</a><a id="adminLink" href="/admin.html" style="display:none">Benutzerverwaltung</a>
+<span id="signedIn"></span><a href="/import.html">CSV/XLSX-Import</a><a href="/roster.html">Klassenraster</a><a href="#certificates">Zertifikate</a><a id="adminLink" href="/admin.html" style="display:none">Benutzerverwaltung</a>
 <button id="changePassword" type="button">Passwort ändern</button>
 <button id="logout" type="button">Abmelden</button></nav>
 <div id="idleWarning" class="warning" hidden>Du wirst in 2 Minuten wegen Inaktivität abgemeldet. <button id="stay" type="button">Weiterarbeiten</button></div>
@@ -45,8 +45,28 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
 <label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
 <label>Münzen<input type="number" name="coins" value="2" min="0" step="0.5" required></label>
-<button>Endgültig verbuchen</button></form><small>Im Prototyp werden Münzen sofort verbucht; Entwurfsspeicherung folgt später.</small></section>
-<section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, noch keine getrennten Münzblöcke oder Zertifikatsstufen.</small></section>
+<button>Endgültig verbuchen</button></form><small>Entwürfe im <a href="/roster.html">Klassenraster</a> speichern.</small></section>
+<section id="certificates">
+<h2>Zertifikate</h2>
+<p>Schüler auswählen und Münzstand sowie Zertifikatsberechtigung prüfen. Ein Zertifikat ist erst ab der vorgeschriebenen Münzgrenze möglich.</p>
+<form onsubmit="return false">
+<label>Schülerin / Schüler <select id="certificateStudent" required></select></label>
+<label>Stichtag <input id="certificateDate" type="date" required></label>
+<button id="certificateCheck" type="button">Status prüfen</button>
+</form>
+<p id="certificateStatus" role="status">Bitte eine Schülerin oder einen Schüler wählen.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button id="certificatePdf" type="button" disabled>PDF herunterladen</button>
+<button id="certificateDocx" type="button" disabled>DOCX herunterladen</button>
+</div>
+<hr>
+<h3>Klassenweise Zertifikate</h3>
+<p><small>ZIP mit Einzel-PDF, Einzel-DOCX und Sammel-PDF für berechtigte Personen. Noch nicht berechtigte Personen werden ausgelassen.</small></p>
+<form onsubmit="return false"><label>Klasse <select id="certificateClass"></select></label>
+<button id="certificateZip" type="button">Klassen-ZIP herunterladen</button></form>
+<p id="certificateClassStatus" role="status"></p>
+</section>
+<section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, Für verbindliche Salden und Zertifikatsstufen bitte die Zertifikatsprüfung verwenden.</small></section>
 <script>
 const $=id=>document.getElementById(id);
 let csrfToken='';let lastActivity=Date.now();
@@ -82,8 +102,10 @@ function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.t
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
  const [students,events]=await Promise.all([api('students'),api('events')]);
- $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();
- for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')')}
+ $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();
+ const classes=new Set();
+ for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');classes.add(s.className)}
+ for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true})))opt($('certificateClass'),c,c);
  for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
 }
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
@@ -95,5 +117,35 @@ function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
 bind('studentForm','students',d=>d.grade=Number(d.grade));
 bind('eventForm','events',d=>d.coins=Number(d.coins));
 bind('grantForm','grants',d=>{d.studentPk=Number(d.studentPk);d.eventId=Number(d.eventId);d.coins=Number(d.coins)});
-sessionInit().then(refresh).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
+const certLevel={NONE:'Noch kein Zertifikat',SUCCESS:'Mit Erfolg',SPECIAL_SUCCESS:'Mit besonderem Erfolg',DISTINCTION:'Mit Auszeichnung',REVIEW_REQUIRED:'Regelprüfung erforderlich'};
+function certEligible(level){return ['SUCCESS','SPECIAL_SUCCESS','DISTINCTION'].includes(level)}
+async function certificateStatus(){
+ const id=$('certificateStudent').value;
+ $('certificatePdf').disabled=true;$('certificateDocx').disabled=true;
+ if(!id){$('certificateStatus').textContent='Bitte zuerst eine Person wählen.';return}
+ $('certificateStatus').textContent='Prüfung läuft …';
+ try{
+  const r=await api('certificates/'+encodeURIComponent(id)+'?asOf='+encodeURIComponent($('certificateDate').value));
+  $('certificateStatus').textContent=r.name+' · '+r.coins+' Münzen · '+(certLevel[r.level]||r.level)+(r.level==='NONE'?' · Es fehlen '+r.nextDistance+' Münzen bis zur nächsten Stufe.':'');
+  const available=certEligible(r.level);
+  $('certificatePdf').disabled=!available;$('certificateDocx').disabled=!available;
+ }catch(e){$('certificateStatus').textContent='Statusprüfung fehlgeschlagen: '+e.message}
+}
+function certificateDownload(ext){
+ const id=$('certificateStudent').value;if(!id)return;
+ location.href='/api/certificates/'+encodeURIComponent(id)+'/'+ext+'?asOf='+encodeURIComponent($('certificateDate').value);
+}
+$('certificateCheck').onclick=certificateStatus;
+$('certificateStudent').onchange=certificateStatus;
+$('certificateDate').onchange=certificateStatus;
+$('certificatePdf').onclick=()=>certificateDownload('pdf');
+$('certificateDocx').onclick=()=>certificateDownload('docx');
+$('certificateZip').onclick=()=>{
+ const c=$('certificateClass').value;
+ if(!c){$('certificateClassStatus').textContent='Bitte eine Klasse wählen.';return}
+ $('certificateClassStatus').textContent='ZIP wird angefordert. Nur berechtigte Schülerinnen und Schüler werden aufgenommen.';
+ location.href='/api/certificates/class/'+encodeURIComponent(c)+'.zip?onlyValid=true&asOf='+encodeURIComponent($('certificateDate').value);
+};
+$('certificateDate').value=new Date().toLocaleDateString('en-CA');
+sessionInit().then(refresh).then(certificateStatus).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
 </script></body></html>
