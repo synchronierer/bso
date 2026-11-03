@@ -9,7 +9,7 @@ header p{margin-bottom:0}.warning{background:#fff1d8;border-left:5px solid #d28b
 section{background:white;padding:20px;border-radius:12px;margin:15px 0;box-shadow:0 2px 8px #0a254010}
 form{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
 input,select,button{font:inherit;border-radius:7px;padding:10px;border:1px solid #bac6d3}
-button{background:#173756;color:white;cursor:pointer;border:0}button:hover{background:#295b86}
+button{background:#173756;color:white;cursor:pointer;border:0}button:not(:disabled):hover{background:#295b86}button:disabled{background:#a6b2bd;color:#f7f9fb;cursor:not-allowed;opacity:.75}
 table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid #e4eaf0;text-align:left}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6c7c}
 #notice{padding:10px;min-height:20px}
