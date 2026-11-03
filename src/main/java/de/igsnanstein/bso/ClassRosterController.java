@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.*;
+import java.time.LocalDate;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
@@ -60,6 +62,11 @@ public class ClassRosterController {
     public Map<String,Object> confirm(@RequestBody Batch b,Authentication auth){
         Map<String,Object> ev=event(b.eventId());
         BigDecimal standard=(BigDecimal)ev.get("coins");
+        Object endValue=ev.get("endDate");
+        if(endValue instanceof java.sql.Date end && end.toLocalDate().isAfter(LocalDate.now()))
+            throw bad("Buchung erst nach dem Veranstaltungsende möglich");
+        if(ev.containsKey("status") && !"AKTIV".equals(ev.get("status")))
+            throw bad("Veranstaltung ist beendet oder abgebrochen");
         List<Assignment> chosen=validate(b,true);
         if(chosen.isEmpty())throw bad("Keine Schülerinnen oder Schüler ausgewählt");
         for(Assignment a:chosen){
@@ -72,9 +79,13 @@ public class ClassRosterController {
                 """,Integer.class,a.studentPk(),b.eventId());
             if(exists>0)throw bad("Münzen für mindestens eine Person bereits verbucht; bitte Raster neu laden");
         }
-        for(Assignment a:chosen){
-            db.update("INSERT INTO coin_grants(student_pk,event_id,coins) VALUES(?,?,?)",
-                a.studentPk(),b.eventId(),a.coins());
+        try {
+            for(Assignment a:chosen) {
+                db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by) VALUES(?,?,?,?)",
+                    a.studentPk(),b.eventId(),a.coins(),auth.getName());
+            }
+        } catch (DataIntegrityViolationException ex) {
+            throw bad("Die Buchung wurde parallel verändert; Raster bitte neu laden");
         }
         db.update("DELETE FROM roster_drafts WHERE username=? AND event_id=? AND class_name=?",
             auth.getName(),b.eventId(),b.className());
@@ -99,7 +110,7 @@ public class ClassRosterController {
     }
     private Map<String,Object> event(long id){
         List<Map<String,Object>> list=db.queryForList(
-          "SELECT id,title,coins,end_date AS \"endDate\" FROM events WHERE id=?",id);
+          "SELECT id,title,coins,end_date AS \"endDate\",status FROM events WHERE id=?",id);
         if(list.isEmpty())throw bad("Veranstaltung nicht vorhanden");
         return list.get(0);
     }
