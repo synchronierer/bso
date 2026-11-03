@@ -68,8 +68,8 @@ public class CsvImportController {
         int changed=0;
         for(Map<String,Object> r:p.rows()){
             if(!"ADD".equals(r.get("action")))continue;
-            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,'WAHLPFLICHT')",
-                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")));
+            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,?)",
+                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")),r.get("kind"));
             changed++;
         }
         return Map.of("message","Veranstaltungsimport abgeschlossen","changed",changed);
@@ -131,7 +131,11 @@ public class CsvImportController {
                             row.put("warning","Über 20 Münzen – bestätigungspflichtig");
                         String key=title+"|"+end;
                         if(!keys.add(key))throw new IllegalArgumentException("Doppelte Veranstaltung in CSV");
-                        row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());
+                        String kind=optionalField(record,"kind","Art","Veranstaltungsart").toUpperCase(Locale.ROOT);
+                        if(kind.isBlank()) kind="WAHLPFLICHT";
+                        if(!Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(kind))
+                            throw new IllegalArgumentException("Veranstaltungsart ungültig");
+                        row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());row.put("kind",kind);
                         Integer n=db.queryForObject("SELECT COUNT(*) FROM events WHERE title=? AND end_date=CAST(? AS DATE)",
                              Integer.class,title,end);
                         action=(n!=null && n>0)?"UNCHANGED":"ADD";
@@ -161,6 +165,11 @@ public class CsvImportController {
             }
         }
         throw new IllegalArgumentException("Fehlende Spalte: "+names[0]);
+    }
+    private String optionalField(CSVRecord record,String...names){
+        for(String name:names) for(String header:record.getParser().getHeaderNames())
+            if(header.equalsIgnoreCase(name)) return record.get(header).trim();
+        return "";
     }
     private ResponseStatusException bad(String msg){
         return new ResponseStatusException(HttpStatus.BAD_REQUEST,msg);
