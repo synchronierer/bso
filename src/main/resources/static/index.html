@@ -40,12 +40,31 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <form id="eventForm"><label>Veranstaltung<input name="title" placeholder="Bewerbungstraining" required></label>
 <label>Abschlussdatum<input name="endDate" type="date" required></label>
 <label>Münzwert<input name="coins" type="number" min="0.5" step="0.5" value="2" required></label>
-<button>Veranstaltung anlegen</button></form></section>
+<label>Veranstaltungsart<select name="kind" id="eventKind"><option value="WAHLPFLICHT">Wahlpflicht</option><option value="PFLICHT">Pflicht</option><option value="WAHL">Wahlveranstaltung</option><option value="WORKSHOP">Netzwerkpartner-Workshop</option></select></label>
+<label id="eventGradeLabel" hidden>Pflicht für Jahrgang<select name="requiredForGrade" id="eventGrade"><option value="">Jahrgang wählen</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option></select></label>
+<label id="eventTrackLabel" hidden>Pflicht für Bildungsgang<select name="requiredForTrack"><option value="">Alle Bildungsgänge des Jahrgangs</option><option>BR</option><option>V10</option><option>S1</option><option>Ü11</option><option>MSS</option></select></label>
+<button>Veranstaltung anlegen</button></form>
+<small>Für Praktika bitte die separate Praktikumserfassung verwenden (10 Münzen je anerkanntem Tag, maximal 100 im Pflichtpraktikum).</small></section>
 <section><h2>Einzelne Münzvergabe (optional)</h2>
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
 <label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
 <label>Münzen<input type="number" name="coins" value="2" min="0" step="0.5" required></label>
 <button>Endgültig verbuchen</button></form><small>Entwürfe im <a href="/roster.html">Klassenraster</a> speichern.</small></section>
+<section id="internships">
+<h2>Praktikum erfassen</h2>
+<p>Praktika werden separat abgerechnet. Pflichtpraktikum: einmal je Münzblock, höchstens 10 Tage bzw. 100 Münzen. Freiwilliges Zusatzpraktikum: einmal je Schuljahr, höchstens 5 Tage bzw. 50 Münzen.</p>
+<form id="internshipForm">
+<label>Schülerin / Schüler<select name="studentPk" id="internshipStudent" required></select></label>
+<label>Art<select name="kind" id="internshipKind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
+<label>Betrieb<input name="company" maxlength="200" required></label>
+<label>Beginn<input name="startsOn" type="date" required></label>
+<label>Ende<input name="endsOn" type="date" required></label>
+<label>Anerkannte Tage<input name="recognizedDays" type="number" id="internshipDays" min="1" max="10" step="1" value="10" required></label>
+<button type="submit">Praktikum endgültig verbuchen</button>
+</form>
+<p id="internshipNotice" role="status"></p>
+<small>Für vorläufige Praktika keinen endgültigen Eintrag erstellen. Die endgültige Erfassung zählt direkt für die Zertifikatsberechnung.</small>
+</section>
 <section id="certificates">
 <h2>Zertifikate</h2>
 <p>Schüler auswählen und Münzstand sowie Zertifikatsberechtigung prüfen. Ein Zertifikat ist erst ab der vorgeschriebenen Münzgrenze möglich.</p>
@@ -102,9 +121,9 @@ function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.t
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
  const [students,events]=await Promise.all([api('students'),api('events')]);
- $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();
+ $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();$('internshipStudent').replaceChildren();
  const classes=new Set();
- for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');classes.add(s.className)}
+ for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');opt($('internshipStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');classes.add(s.className)}
  for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true})))opt($('certificateClass'),c,c);
  for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
 }
@@ -115,8 +134,34 @@ function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
  catch(e){$('notice').textContent=e.message}
 })}
 bind('studentForm','students',d=>d.grade=Number(d.grade));
+$('eventKind').onchange=()=>{
+ const isRequired=$('eventKind').value==='PFLICHT';
+ $('eventGradeLabel').hidden=!isRequired;$('eventTrackLabel').hidden=!isRequired;
+ $('eventGrade').required=isRequired;
+};
+$('internshipKind').onchange=()=>{
+ const additional=$('internshipKind').value==='ZUSATZ';
+ $('internshipDays').max=additional?'5':'10';
+ if(Number($('internshipDays').value)>(additional?5:10))$('internshipDays').value=additional?'5':'10';
+};
+$('internshipForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();
+ const d=Object.fromEntries(new FormData(ev.target).entries());
+ d.studentPk=Number(d.studentPk);d.recognizedDays=Number(d.recognizedDays);d.finalised=true;
+ const coins=d.recognizedDays*10;
+ if(!confirm(d.kind==='PFLICHT'?'Pflichtpraktikum mit '+coins+' Münzen endgültig anrechnen? Die erste endgültige Buchung schließt die Abrechnung in diesem Münzblock ab.':'Freiwilliges Praktikum mit '+coins+' Münzen endgültig anrechnen?'))return;
+ try{
+  const r=await api('internships',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  $('internshipNotice').textContent=r.message+' · '+r.coins+' Münzen';
+  await refresh();await certificateStatus();
+ }catch(e){$('internshipNotice').textContent='Praktikum konnte nicht gespeichert werden: '+e.message}
+});
 bind('eventForm','events',d=>{
  d.coins=Number(d.coins);
+ if(d.kind==='PFLICHT'){
+  d.requiredForGrade=Number(d.requiredForGrade);
+  if(!Number.isInteger(d.requiredForGrade)||d.requiredForGrade<7||d.requiredForGrade>13){$('notice').textContent='Bitte den Zieljahrgang der Pflichtveranstaltung auswählen.';return false}
+ }else{delete d.requiredForGrade;delete d.requiredForTrack;}
  if(!Number.isFinite(d.coins) || d.coins<0.5 || Math.round(d.coins*2)!==d.coins*2){
   $('notice').textContent='Bitte einen positiven Münzwert in 0,5er-Schritten eingeben.';
   return false;
