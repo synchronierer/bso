@@ -51,7 +51,11 @@ public class UserAdministration {
     }
 
     @GetMapping("/csrf")
-    public Map<String,String> csrf(org.springframework.security.web.csrf.CsrfToken token) {
+    public Map<String,String> csrf(jakarta.servlet.http.HttpServletRequest request) {
+        org.springframework.security.web.csrf.CsrfToken token =
+          (org.springframework.security.web.csrf.CsrfToken)request.getAttribute(
+              org.springframework.security.web.csrf.CsrfToken.class.getName());
+        if(token==null)throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,"CSRF-Token fehlt");
         return Map.of("token",token.getToken(),"headerName",token.getHeaderName());
     }
 
