@@ -1,0 +1,15 @@
+{
+  # Interne CA erzeugt ein Zertifikat für die feste Schulserver-IP.
+  # Root-CA muss auf verwalteten Schulgeräten vertrauenswürdig installiert werden.
+  auto_https disable_redirects
+}
+https://172.26.33.19 {
+  tls internal
+  encode zstd gzip
+  header {
+    Strict-Transport-Security "max-age=31536000"
+    X-Content-Type-Options "nosniff"
+    Referrer-Policy "no-referrer"
+  }
+  reverse_proxy web:8080
+}
