@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSO – IGS Am Nanstein | Demoversion</title>
+<style>
+:root{font-family:system-ui,Arial,sans-serif;color:#162338;background:#f4f6fa}
+body{max-width:1100px;margin:35px auto;padding:0 18px}h1{margin:0 0 4px}
+header{background:#173756;color:white;border-radius:14px;padding:25px;margin-bottom:20px}
+header p{margin-bottom:0}.warning{background:#fff1d8;border-left:5px solid #d28b14;padding:12px 18px;border-radius:7px;margin-bottom:20px}
+section{background:white;padding:20px;border-radius:12px;margin:15px 0;box-shadow:0 2px 8px #0a254010}
+form{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+input,select,button{font:inherit;border-radius:7px;padding:10px;border:1px solid #bac6d3}
+button{background:#173756;color:white;cursor:pointer;border:0}button:hover{background:#295b86}
+table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid #e4eaf0;text-align:left}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6c7c}
+#notice{padding:10px;min-height:20px}
+</style></head><body>
+<header><h1>BSO-Münzverwaltung</h1><p>Integrierte Gesamtschule Am Nanstein · Technische Demoversion</p></header>
+<div class="warning"><strong>Nur Demo:</strong> keine Anmeldung, kein HTTPS und noch keine vollständigen BSO-Sonderregeln. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
+<div id="notice" role="status"></div>
+<section><h2>Schülerin / Schüler anlegen</h2>
+<form id="studentForm">
+<label>Schüler-ID<input name="studentId" placeholder="DEMO-001" required></label>
+<label>Vorname<input name="firstName" required></label>
+<label>Nachname<input name="lastName" required></label>
+<label>Klasse<input name="className" placeholder="9a" required></label>
+<label>Jahrgang<input name="grade" type="number" min="7" max="13" value="9" required></label>
+<label>Bildungsgang<select name="track"><option>BR</option><option>V10</option><option>S1</option><option>Ü11</option><option>MSS</option></select></label>
+<button>Schüler anlegen</button></form></section>
+<section><h2>Veranstaltung anlegen</h2>
+<form id="eventForm"><label>Veranstaltung<input name="title" placeholder="Bewerbungstraining" required></label>
+<label>Abschlussdatum<input name="endDate" type="date" required></label>
+<label>Münzwert<input name="coins" type="number" min="0.5" max="20" step="0.5" value="2" required></label>
+<button>Veranstaltung anlegen</button></form></section>
+<section><h2>Münzen verbuchen</h2>
+<form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
+<label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
+<label>Münzen<input type="number" name="coins" value="2" min="0" step="0.5" required></label>
+<button>Endgültig verbuchen</button></form><small>Im Prototyp werden Münzen sofort verbucht; Entwurfsspeicherung folgt später.</small></section>
+<section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, noch keine getrennten Münzblöcke oder Zertifikatsstufen.</small></section>
+<script>
+const $=id=>document.getElementById(id);
+async function api(url,opts){const r=await fetch('/api/'+url,opts);if(!r.ok){let e='Fehler '+r.status;try{const j=await r.json();e=j.message||e}catch{}throw Error(e)}return r.json()}
+function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.textContent=txt;sel.append(o)}
+function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
+async function refresh(){
+ const [students,events]=await Promise.all([api('students'),api('events')]);
+ $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();
+ for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')')}
+ for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
+}
+function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
+ ev.preventDefault();const data=Object.fromEntries(new FormData(ev.target).entries());
+ if(prepare)prepare(data);
+ try{const response=await api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});$('notice').textContent=response.message;await refresh()}
+ catch(e){$('notice').textContent=e.message}
+})}
+bind('studentForm','students',d=>d.grade=Number(d.grade));
+bind('eventForm','events',d=>d.coins=Number(d.coins));
+bind('grantForm','grants',d=>{d.studentPk=Number(d.studentPk);d.eventId=Number(d.eventId);d.coins=Number(d.coins)});
+refresh().catch(e=>$('notice').textContent=e.message);
+</script></body></html>
