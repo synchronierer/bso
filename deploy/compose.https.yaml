@@ -1,0 +1,20 @@
+# Zusätzlicher HTTPS-Proxy für die BSO-Demo.
+# WICHTIG: Der Hauptservice 'web' veröffentlicht standardmäßig noch Port 8081.
+# Vor echtem Betrieb Host-Port in compose.yaml auf 127.0.0.1 beschränken!
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - bso_caddy_data:/data
+      - bso_caddy_config:/config
+    networks:
+      - private
+volumes:
+  bso_caddy_data:
+  bso_caddy_config:
