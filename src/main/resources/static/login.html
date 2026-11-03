@@ -1,0 +1,20 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>BSO – Anmeldung</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font:16px system-ui,Arial,sans-serif;background:#f4f6fa;color:#1b3046;display:grid;place-items:center;min-height:85vh}
+main{background:white;padding:36px;border-radius:14px;box-shadow:0 3px 20px #132c4518;width:min(390px,90vw)}
+label{display:block;margin:18px 0}input{width:100%;box-sizing:border-box;padding:12px;margin-top:5px;font:inherit}
+button{background:#173756;color:white;border:0;border-radius:7px;padding:12px 18px;font:inherit;width:100%;cursor:pointer}
+small{display:block;color:#705b21;margin-top:20px}.error{color:#a02424}</style></head>
+<body><main><h1>BSO-Anmeldung</h1><p>IGS Am Nanstein · Demoversion</p>
+<p id="status" role="status"></p>
+<form method="post" action="/login"><label>Benutzername<input name="username" autocomplete="username" required></label>
+<label>Passwort<input type="password" name="password" autocomplete="current-password" required></label>
+<input id="csrf" type="hidden" name="_csrf"><button>Anmelden</button></form>
+<small>Die Verbindung verwendet in dieser Demo noch HTTP. Keine echten Schülerdaten erfassen.</small></main>
+<script>
+const query=new URLSearchParams(location.search);
+if(query.has('error'))document.getElementById('status').textContent='Benutzername oder Passwort falsch.';
+if(query.has('expired'))document.getElementById('status').textContent='Sitzung abgelaufen. Bitte erneut anmelden.';
+fetch('/api/csrf',{credentials:'same-origin'}).then(r=>r.json()).then(x=>document.getElementById('csrf').value=x.token)
+.catch(()=>document.getElementById('status').textContent='Verbindung zum Server fehlgeschlagen.');
+</script></body></html>
