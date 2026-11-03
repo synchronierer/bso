@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bso
+      POSTGRES_USER: bso
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
+    volumes:
+      - bso_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bso -d bso"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/bso
+      SPRING_DATASOURCE_USERNAME: bso
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
+    ports:
+      - "8080:8080"
+    networks: [private]
+volumes:
+  bso_db:
+networks:
+  private:
