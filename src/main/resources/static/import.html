@@ -1,0 +1,51 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BSO – CSV-Import</title><style>
+body{font:16px system-ui,Arial,sans-serif;background:#f4f7fb;color:#193047;max-width:1100px;margin:30px auto;padding:15px}
+section{background:white;padding:22px;border-radius:12px;margin:20px 0}input,select,button{font:inherit;padding:10px}
+button{background:#173756;color:white;border:0;border-radius:8px;cursor:pointer;margin:8px 8px 8px 0}
+button:disabled{opacity:.45;cursor:not-allowed}table{border-collapse:collapse;width:100%;font-size:14px}
+td,th{padding:8px;border-bottom:1px solid #e0e6ee;text-align:left;white-space:nowrap}
+.scroll{overflow:auto;max-height:450px}.note{background:#fff4d9;padding:12px;border-radius:7px}</style></head>
+<body><h1>CSV-Import</h1><p><a href="/">Zur Übersicht</a></p>
+<p class="note"><strong>Demo, noch kein Echtbetrieb.</strong> Nur fiktive Daten. Trennzeichen Semikolon oder Komma, UTF-8. Vor der Übernahme gibt es immer eine Vorschau.</p>
+<section><h2>1. Datei auswählen</h2>
+<p><label>Datentyp: <select id="kind"><option value="students">Schülerinnen und Schüler</option><option value="events">Veranstaltungen</option></select></label></p>
+<p id="columns">Spalten: <code>studentId;firstName;lastName;className;grade;track</code></p>
+<input type="file" id="file" accept=".csv,text/csv">
+<button id="preview">Vorschau anzeigen</button>
+<p id="message" role="status"></p></section>
+<section id="result" hidden><h2>2. Prüfen und übernehmen</h2><p id="counts"></p>
+<div class="scroll"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
+<p><button id="confirm" disabled>Import bestätigen</button><button id="cancel">Abbrechen</button></p>
+</section>
+<script>
+let csrf='';let csv='';let kind='';let summary;
+const el=id=>document.getElementById(id);
+fetch('/api/csrf').then(r=>r.json()).then(x=>csrf=x.token);
+el('kind').onchange=()=>{el('columns').innerHTML=el('kind').value==='students'
+?'Spalten: <code>studentId;firstName;lastName;className;grade;track</code>'
+:'Spalten: <code>title;endDate;coins</code> (Datum: JJJJ-MM-TT)';
+el('result').hidden=true};
+async function post(url,payload){
+const r=await fetch('/api/import/'+url,{method:'POST',headers:{'Content-Type':'application/json','X-XSRF-TOKEN':csrf},
+body:JSON.stringify(payload)});
+if(!r.ok){let m='Fehler (HTTP '+r.status+')';try{let x=await r.json();m=x.detail||x.message||m}catch{}throw Error(m)}
+return r.json()}
+el('preview').onclick=async()=>{
+const file=el('file').files[0];if(!file){el('message').textContent='Bitte CSV-Datei auswählen';return}
+try{csv=await file.text();kind=el('kind').value;summary=await post(kind+'/preview',{csv});
+el('result').hidden=false;
+el('counts').textContent='Neu: '+summary.added+' · Aktualisiert: '+summary.updated+' · Unverändert: '+summary.unchanged+' · Fehler: '+summary.errors;
+const cols=kind==='students'?['action','studentId','lastName','firstName','className','grade','track','error']:['action','title','endDate','coins','error'];
+const header=document.createElement('tr');for(let c of cols){let th=document.createElement('th');th.textContent=c;header.append(th)}el('head').replaceChildren(header);
+el('rows').replaceChildren();for(let row of summary.rows){let tr=document.createElement('tr');for(let c of cols){let td=document.createElement('td');td.textContent=row[c]??'';tr.append(td)}el('rows').append(tr)}
+el('confirm').disabled=summary.errors>0 || (summary.added+summary.updated===0);
+el('message').textContent='Vorschau erstellt – es wurde noch nichts gespeichert.';
+}catch(e){el('message').textContent=e.message;el('result').hidden=true}};
+el('confirm').onclick=async()=>{
+if(!confirm('Alle geprüften Änderungen jetzt endgültig übernehmen?'))return;
+el('confirm').disabled=true;
+try{const r=await post(kind+'/confirm',{csv});el('message').textContent=r.message+': '+r.changed+' Einträge geändert';el('result').hidden=true}
+catch(e){el('message').textContent=e.message;el('confirm').disabled=false}};
+el('cancel').onclick=()=>{el('result').hidden=true;csv=''};
+</script></body></html>
