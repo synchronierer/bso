@@ -13,6 +13,7 @@ Stand: 2026-11-03 · Issue #1 · Feature-Branch `feature/issue-1-bso-production-
 - Schuljahreswechsel und Bildungsganghistorie werden additiv in Episoden/Zuordnungen geführt; Vorschau und bestätigte Anwendung decken Versetzung, Wiederholung, Austritt und Wiedereintritt ab.
 - Münzbuchungen und Praktika tragen jetzt zwingend `episode_id`; vorhandene Datensätze werden datumsbezogen rückverknüpft. Neue Schüler erhalten per Datenbanktrigger automatisch eine eigene Startepisode. Wiedereintrittssalden beginnen nachweisbar bei null.
 - Pflichtveranstaltungsanforderungen können pro Schuljahr/Jahrgang/Track mit Mindestanzahl und Äquivalenzgruppe überwacht werden. Veranstaltungs-Korrekturen und Absagen markieren abhängige Zertifikate automatisch zur Prüfung.
+- Die Zertifikatsausgabe nutzt jetzt ein einheitliches typografisches Layout mit vollständigem Schulkopf, tabellarischen Münz-/Veranstaltungs-/Praktikumsabschnitten, Stichtag/Schuljahr und Unterschriftszeile. PDF und DOCX werden aus derselben fachlichen Breakdown-Struktur erzeugt.
 - Backup-/Restore-Skripte sichern PostgreSQL im Custom-Format, optionale Ablage und löschen nur Backups älter als 30 Tage.
 
 ## Noch keine Produktionsfreigabe
@@ -22,7 +23,7 @@ Dieser Branch ist nicht für Echtdaten freigegeben. Vor einer gemeinsamen Freiga
 - fachlicher Abschluss der T01–T25-Matrix, insbesondere Praktikums-POSTs, vollständiger Workshopkatalog, visuelle Zertifikatsprüfung und vollständige Berechtigungsmatrix; technische Kernnachweise stehen in `docs/TEST_MATRIX.md`;
 - produktionsnahe Backup-/Restore-Abnahme mit den tatsächlich von der Schul-IT verwendeten Dokument-/Signaturpfaden;
 - Sicherheits-/Datenschutzprüfung einschließlich Nginx-Vertrauen, Cookie-/Session-Prüfung, Upload-Schutz, Aufbewahrung und Löschkonzept;
-- fachliche Prüfung der Veranstaltungskataloge sowie Freigabe von Schulbriefkopf und Signatur; die generierten Dokumente enthalten die fiktiven Veranstaltungs-/Praktikumslisten und müssen visuell durch die Schule abgenommen werden;
+- Bereitstellung und fachliche Freigabe der echten `BK_Kania.docx`-/`ZertifikatVorlage.docx`-Materialien sowie einer freigegebenen Signaturgrafik; diese Dateien waren im Branch nicht vorhanden und wurden nicht erfunden. Das implementierte Ersatzlayout ist visuell geprüft, aber noch nicht die Vorlagenabnahme;
 - Installation auf einer separaten Testinstanz mit fiktiven Daten und dokumentiertem Rollback.
 
 ## Update und Rollback
@@ -41,5 +42,6 @@ Dieser Branch ist nicht für Echtdaten freigegeben. Vor einer gemeinsamen Freiga
 - Backup/Restore-Test auf dem separaten Compose-Volume: bestanden; Schema-Historie und `app_users` nach Restore vorhanden.
 - RC1-HTTP-Test: zwei parallele Münzbuchungen lieferten genau eine Annahme und eine 400-Ablehnung; zwei parallele Draft-Speicherungen hinterließen genau einen Draft; fehlender CSRF-Token wurde mit 403 abgewiesen.
 - RC1-Dateitest: PDF/DOCX mit fiktiven Daten erzeugt, DOCX-Inhalte extrahiert und Datenbank plus Dateiarchiv auf isolierter Instanz wiederhergestellt.
+- Zertifikatslayout-Test: PDFBox meldete eine Seite und Pflichttext; Apache POI meldete drei DOCX-Tabellen und vollständigen Schulkopf/Inhalt; gerenderte PDF visuell ohne abgeschnittene Tabellen geprüft.
 - Vollständiger Testlauf gegen die echte `.env`/Schulserverumgebung: bewusst nicht ausgeführt.
 - Echtdaten: nicht verwendet und nicht freigegeben.

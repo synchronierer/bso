@@ -14,7 +14,7 @@ Stand 2026-11-03 RC1. „Automatisiert“ bedeutet, dass der Kern im Code oder d
 | T15–T16 | implementiert/getestet | parallele HTTP-Buchung ergibt 201/400 und genau einen Ledger-Eintrag; parallele Entwurfsspeicherung ergibt genau einen Draft |
 | T17 | implementiert | Korrektur-/Status-Endpunkte markieren betroffene Zertifikate `PRUEFUNG_ERFORDERLICH`; erneute Ausgabe erfordert explizite neue Version |
 | T18 | teilweise | Klassenzip kann nur gültige Datensätze ausgeben; Fehlerbericht/UI-Entscheidung ist noch abzunehmen |
-| T19 | teilweise getestet | Realistische fiktive PDF/DOCX-Einzeldateien erzeugt; DOCX-Inhalte und PDF-Bytes geprüft, formale PDFBox-Seitenassertion/visuelle Schulabnahme verbleibt |
+| T19 | implementiert/getestet | Zwei realistische fiktive Varianten mit Veranstaltung und Praktikum erzeugt; PDFBox: 1 Seite/Text, Apache POI: DOCX-Tabellen und Pflichttexte, gerenderte Seite visuell geprüft |
 | T20 | implementiert/getestet | isolierter Restore von PostgreSQL plus Dateiarchiv für Zertifikats-/Signaturablage; Flyway V1–V6 und Healthcheck danach erfolgreich |
 | T21 | implementiert | CSV/XLSX-Vorschau gleicht stabile ID ab und verhindert Dubletten |
 | T22–T23 | implementiert/getestet | Schuljahreswechsel mit Vorschau, bestätigter Anwendung und Historien-/Episodenpersistenz; fachliche Importvollständigkeit bleibt offen |
