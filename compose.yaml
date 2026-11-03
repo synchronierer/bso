@@ -23,8 +23,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/bso
       SPRING_DATASOURCE_USERNAME: bso
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
+      BSO_ADMIN_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Bitte ADMIN_INITIAL_PASSWORD in .env setzen}
     ports:
-      - "8080:8080"
+      - "${BSO_PORT:-8081}:8080"
     networks: [private]
 volumes:
   bso_db:
