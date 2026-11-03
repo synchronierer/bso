@@ -15,7 +15,12 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 #notice{padding:10px;min-height:20px}
 </style></head><body>
 <header><h1>BSO-Münzverwaltung</h1><p>Integrierte Gesamtschule Am Nanstein · Technische Demoversion</p></header>
-<div class="warning"><strong>Nur Demo:</strong> keine Anmeldung, kein HTTPS und noch keine vollständigen BSO-Sonderregeln. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
+<div class="warning"><strong>Nur Demo:</strong> Anmeldung vorhanden, aber noch kein HTTPS und keine vollständigen BSO-Sonderregeln. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
+<nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+<span id="signedIn"></span><a id="adminLink" href="/admin.html" style="display:none">Benutzerverwaltung</a>
+<button id="changePassword" type="button">Passwort ändern</button>
+<button id="logout" type="button">Abmelden</button></nav>
+<div id="idleWarning" class="warning" hidden>Du wirst in 2 Minuten wegen Inaktivität abgemeldet. <button id="stay" type="button">Weiterarbeiten</button></div>
 <div id="notice" role="status"></div>
 <section><h2>Schülerin / Schüler anlegen</h2>
 <form id="studentForm">
@@ -39,7 +44,35 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, noch keine getrennten Münzblöcke oder Zertifikatsstufen.</small></section>
 <script>
 const $=id=>document.getElementById(id);
-async function api(url,opts){const r=await fetch('/api/'+url,opts);if(!r.ok){let e='Fehler '+r.status;try{const j=await r.json();e=j.message||e}catch{}throw Error(e)}return r.json()}
+let csrfToken='';let lastActivity=Date.now();
+async function sessionInit(){
+  const token=await fetch('/api/csrf').then(r=>r.json());csrfToken=token.token;
+  const me=await fetch('/api/me').then(r=>{if(!r.ok)throw Error('Nicht angemeldet');return r.json()});
+  $('signedIn').textContent='Angemeldet: '+me.username;
+  if(me.admin)$('adminLink').style.display='inline';
+}
+async function keepAlive(){const r=await fetch('/api/me');if(!r.ok)location.href='/login.html?expired';else {lastActivity=Date.now();$('idleWarning').hidden=true}}
+for(const name of ['click','keydown','mousemove','scroll']){
+  document.addEventListener(name,()=>{lastActivity=Date.now();$('idleWarning').hidden=true},{passive:true});
+}
+setInterval(()=>{const elapsed=Date.now()-lastActivity;
+  $('idleWarning').hidden=elapsed<28*60*1000;
+  if(elapsed>=30*60*1000)location.href='/login.html?expired';
+  else if(elapsed<3*60*1000)fetch('/api/me').catch(()=>{});
+},60000);
+$('stay').onclick=keepAlive;
+$('logout').onclick=async()=>{
+ await fetch('/logout',{method:'POST',headers:{'X-XSRF-TOKEN':csrfToken}});
+ location.href='/login.html?logout';
+};
+$('changePassword').onclick=async()=>{
+ const oldPassword=prompt('Aktuelles Passwort:');if(oldPassword===null)return;
+ const newPassword=prompt('Neues Passwort (mindestens 12 Zeichen):');if(newPassword===null)return;
+ try {const r=await fetch('/api/password',{method:'POST',headers:{'Content-Type':'application/json','X-XSRF-TOKEN':csrfToken},
+ body:JSON.stringify({currentPassword:oldPassword,newPassword})});if(!r.ok)throw Error('Passwort konnte nicht geändert werden');
+ $('notice').textContent='Passwort geändert';}catch(e){$('notice').textContent=e.message}
+};
+async function api(url,opts){opts=opts||{};if(opts.method&&opts.method!=='GET')opts.headers={...(opts.headers||{}),'X-XSRF-TOKEN':csrfToken};const r=await fetch('/api/'+url,opts);if(r.redirected||r.status===401){location.href='/login.html?expired';throw Error('Sitzung abgelaufen')}if(!r.ok){let e='Fehler '+r.status;try{const j=await r.json();e=j.message||e}catch{}throw Error(e)}return r.json()}
 function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.textContent=txt;sel.append(o)}
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
@@ -57,5 +90,5 @@ function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
 bind('studentForm','students',d=>d.grade=Number(d.grade));
 bind('eventForm','events',d=>d.coins=Number(d.coins));
 bind('grantForm','grants',d=>{d.studentPk=Number(d.studentPk);d.eventId=Number(d.eventId);d.coins=Number(d.coins)});
-refresh().catch(e=>$('notice').textContent=e.message);
+sessionInit().then(refresh).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
 </script></body></html>
