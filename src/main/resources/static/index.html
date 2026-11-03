@@ -77,6 +77,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <button id="certificatePdf" type="button" disabled>PDF herunterladen</button>
 <button id="certificateDocx" type="button" disabled>DOCX herunterladen</button>
+<button id="certificateNewVersion" type="button" disabled>Neue Zertifikatsversion erstellen (PDF)</button>
 </div>
 <hr>
 <h3>Klassenweise Zertifikate</h3>
@@ -176,14 +177,14 @@ const certLevel={NONE:'Noch kein Zertifikat',SUCCESS:'Mit Erfolg',SPECIAL_SUCCES
 function certEligible(level){return ['SUCCESS','SPECIAL_SUCCESS','DISTINCTION'].includes(level)}
 async function certificateStatus(){
  const id=$('certificateStudent').value;
- $('certificatePdf').disabled=true;$('certificateDocx').disabled=true;
+ $('certificatePdf').disabled=true;$('certificateDocx').disabled=true;$('certificateNewVersion').disabled=true;
  if(!id){$('certificateStatus').textContent='Bitte zuerst eine Person wählen.';return}
  $('certificateStatus').textContent='Prüfung läuft …';
  try{
   const r=await api('certificates/'+encodeURIComponent(id)+'?asOf='+encodeURIComponent($('certificateDate').value));
   $('certificateStatus').textContent=r.name+' · '+r.coins+' Münzen · '+(certLevel[r.level]||r.level)+(r.level==='NONE'?' · Es fehlen '+r.nextDistance+' Münzen bis zur nächsten Stufe.':'');
   const available=certEligible(r.level);
-  $('certificatePdf').disabled=!available;$('certificateDocx').disabled=!available;
+  $('certificatePdf').disabled=!available;$('certificateDocx').disabled=!available;$('certificateNewVersion').disabled=!available;
  }catch(e){$('certificateStatus').textContent='Statusprüfung fehlgeschlagen: '+e.message}
 }
 function certificateDownload(ext){
@@ -195,6 +196,12 @@ $('certificateStudent').onchange=certificateStatus;
 $('certificateDate').onchange=certificateStatus;
 $('certificatePdf').onclick=()=>certificateDownload('pdf');
 $('certificateDocx').onclick=()=>certificateDownload('docx');
+$('certificateNewVersion').onclick=()=>{
+ const id=$('certificateStudent').value;
+ if(!id || $('certificateNewVersion').disabled)return;
+ if(!confirm('Neue, archivierte Zertifikatsversion für die ausgewählte Person erstellen? Die bisherige Version bleibt erhalten.'))return;
+ location.href='/api/certificates/'+encodeURIComponent(id)+'/pdf?asOf='+encodeURIComponent($('certificateDate').value)+'&newVersion=true';
+};
 $('certificateZip').onclick=()=>{
  const c=$('certificateClass').value;
  if(!c){$('certificateClassStatus').textContent='Bitte eine Klasse wählen.';return}
