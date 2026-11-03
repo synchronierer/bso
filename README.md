@@ -59,3 +59,12 @@ Die Umsetzung des vollständigen Pflichtenhefts erfolgt in weiteren Schritten. D
 **Sitzung:** 30 Minuten Inaktivität; UI-Warnung ab Minute 28. Die serverseitige Sitzungszeit beträgt 30 Minuten. Passwörter liegen ausschließlich gehasht vor. Das Startpasswort aus `.env` wird nur beim **erstmaligen** Anlegen des Administrationskontos verwendet.
 
 **Sicherheitsvorbehalt:** HTTP überträgt Sitzungsinformationen unverschlüsselt. Noch keine echten Schülerdaten eingeben, auch mit Login nicht. Vor Echtbetrieb HTTPS auf der internen IP, Backup/Restore, Audit und Datenschutzfreigabe ergänzen.
+
+## Einfacher Workflow: CSV und klassenweise Münzen
+
+- **CSV-Schülerimport:** `/import.html` öffnen und Schüler auswählen. CSV in UTF-8 mit Kopfzeile `studentId;firstName;lastName;className;grade;track`. Vor dem Import werden neue, geänderte, unveränderte und fehlerhafte Zeilen angezeigt. Die Schüler-ID ist der Schlüssel.
+- **CSV-Veranstaltungsimport:** Auf derselben Seite „Veranstaltungen“ wählen. Kopfzeile `title;endDate;coins`, z. B. `Bewerbungstraining;2026-11-03;2`. Gleiche Namen + Abschlusstermine werden in der einfachen Demo übersprungen. Die Ereignis-Äquivalenzlogik folgt später.
+- **Klassenraster:** `/roster.html`, Klasse und Veranstaltung auswählen, Schüler per Häkchen markieren, vorgegebenen Münzwert einzeln nach unten anpassen und als Stapel endgültig verbuchen. Entwurf wird serverseitig zwischengespeichert. Bereits für dieses Event verbuchte Schüler sind gesperrt.
+- **Wichtig:** Der Prototyp prüft noch nicht alle BSO-Sonderregeln; insbesondere Jahrgangsblöcke, Pflichtpraktika, Wiederholungen und Veranstaltungsgruppen fehlen weiterhin.
+
+Der neue Docker-Compose-Standardport ist 8081; andere lokale Änderungen der Schul-IT können davon abweichen.
