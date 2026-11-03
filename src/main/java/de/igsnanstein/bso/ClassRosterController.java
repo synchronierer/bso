@@ -31,7 +31,7 @@ public class ClassRosterController {
             WHERE s.class_name=? ORDER BY s.last_name,s.first_name,s.id
             """,eventId,className);
         List<Map<String,Object>> drafts=db.queryForList(
-                "SELECT entries FROM roster_drafts WHERE username=? AND event_id=? AND class_name=?",
+                "SELECT entries::text AS entries FROM roster_drafts WHERE username=? AND event_id=? AND class_name=?",
                 auth.getName(),eventId,className);
         Object draft=drafts.isEmpty()?List.of():drafts.get(0).get("entries");
         return Map.of("event",event,"students",students,"draft",draft==null?List.of():draft);
