@@ -39,7 +39,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <section><h2>Veranstaltung anlegen</h2>
 <form id="eventForm"><label>Veranstaltung<input name="title" placeholder="Bewerbungstraining" required></label>
 <label>Abschlussdatum<input name="endDate" type="date" required></label>
-<label>Münzwert<input name="coins" type="number" min="0.5" max="20" step="0.5" value="2" required></label>
+<label>Münzwert<input name="coins" type="number" min="0.5" step="0.5" value="2" required></label>
 <button>Veranstaltung anlegen</button></form></section>
 <section><h2>Einzelne Münzvergabe (optional)</h2>
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
@@ -110,12 +110,22 @@ async function refresh(){
 }
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
  ev.preventDefault();const data=Object.fromEntries(new FormData(ev.target).entries());
- if(prepare)prepare(data);
+ if(prepare && prepare(data)===false)return;
  try{const response=await api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});$('notice').textContent=response.message;await refresh()}
  catch(e){$('notice').textContent=e.message}
 })}
 bind('studentForm','students',d=>d.grade=Number(d.grade));
-bind('eventForm','events',d=>d.coins=Number(d.coins));
+bind('eventForm','events',d=>{
+ d.coins=Number(d.coins);
+ if(!Number.isFinite(d.coins) || d.coins<0.5 || Math.round(d.coins*2)!==d.coins*2){
+  $('notice').textContent='Bitte einen positiven Münzwert in 0,5er-Schritten eingeben.';
+  return false;
+ }
+ if(d.coins>20){
+  if(!confirm('Plausibilitätswarnung: '+d.coins.toLocaleString('de-DE')+' Münzen für eine Veranstaltung sind ungewöhnlich hoch. Soll dieser Münzwert wirklich verwendet werden?'))return false;
+  d.confirmHighValue=true;
+ }
+});
 bind('grantForm','grants',d=>{d.studentPk=Number(d.studentPk);d.eventId=Number(d.eventId);d.coins=Number(d.coins)});
 const certLevel={NONE:'Noch kein Zertifikat',SUCCESS:'Mit Erfolg',SPECIAL_SUCCESS:'Mit besonderem Erfolg',DISTINCTION:'Mit Auszeichnung',REVIEW_REQUIRED:'Regelprüfung erforderlich'};
 function certEligible(level){return ['SUCCESS','SPECIAL_SUCCESS','DISTINCTION'].includes(level)}
