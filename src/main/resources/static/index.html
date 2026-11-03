@@ -22,7 +22,12 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <button id="logout" type="button">Abmelden</button></nav>
 <div id="idleWarning" class="warning" hidden>Du wirst in 2 Minuten wegen Inaktivität abgemeldet. <button id="stay" type="button">Weiterarbeiten</button></div>
 <div id="notice" role="status"></div>
-<section><h2>Schülerin / Schüler anlegen</h2>
+<section style="border:2px solid #dce8f3"><h2>Empfohlener Ablauf</h2>
+<p><strong>1.</strong> <a href="/import.html">CSV importieren</a> (Schüler und Veranstaltungen) &nbsp;→&nbsp;
+<strong>2.</strong> <a href="/roster.html">Klassenraster öffnen</a> &nbsp;→&nbsp;
+<strong>3.</strong> Schüler abhaken und Münzen gemeinsam verbuchen.</p>
+<p><small>Die folgenden Formulare sind nur für einzelne Nachträge gedacht.</small></p></section>
+<section><h2>Einzelne Schülerin / einzelnen Schüler anlegen</h2>
 <form id="studentForm">
 <label>Schüler-ID<input name="studentId" placeholder="DEMO-001" required></label>
 <label>Vorname<input name="firstName" required></label>
@@ -36,7 +41,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <label>Abschlussdatum<input name="endDate" type="date" required></label>
 <label>Münzwert<input name="coins" type="number" min="0.5" max="20" step="0.5" value="2" required></label>
 <button>Veranstaltung anlegen</button></form></section>
-<section><h2>Münzen verbuchen</h2>
+<section><h2>Einzelne Münzvergabe (optional)</h2>
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
 <label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
 <label>Münzen<input type="number" name="coins" value="2" min="0" step="0.5" required></label>
