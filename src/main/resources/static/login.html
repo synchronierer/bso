@@ -10,7 +10,7 @@ small{display:block;color:#705b21;margin-top:20px}.error{color:#a02424}</style><
 <form method="post" action="/login"><label>Benutzername<input name="username" autocomplete="username" required></label>
 <label>Passwort<input type="password" name="password" autocomplete="current-password" required></label>
 <input id="csrf" type="hidden" name="_csrf"><button>Anmelden</button></form>
-<small>Die Verbindung verwendet in dieser Demo noch HTTP. Keine echten Schülerdaten erfassen.</small></main>
+<small>Nur freigegebene HTTPS-Verbindungen verwenden. Diese Testversion ist noch nicht für echte Schülerdaten freigegeben.</small></main>
 <script>
 const query=new URLSearchParams(location.search);
 if(query.has('error'))document.getElementById('status').textContent='Benutzername oder Passwort falsch.';
