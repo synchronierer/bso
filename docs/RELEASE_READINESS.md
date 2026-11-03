@@ -10,16 +10,18 @@ Stand: 2026-11-03 · Issue #1 · Feature-Branch `feature/issue-1-bso-production-
 - Der Java-Container wird in Compose nur auf `127.0.0.1` veröffentlicht. HTTPS bleibt Aufgabe des vorhandenen, von der Schul-IT verwalteten Nginx-Reverse-Proxys.
 - XLSX-Importe für Schüler und Veranstaltungen nutzen eine unveränderliche Vorschau, SHA-256-Idempotenz, Duplikatprüfung und explizite Übernahme; CSV bleibt verfügbar.
 - Praktika, Klassenwiederholung und Zertifikatsversionen sind serverseitig persistiert; Einzel-PDF/DOCX und Klassen-ZIP sind geschützt authentifizierte Endpunkte.
+- Schuljahreswechsel und Bildungsganghistorie werden additiv in Episoden/Zuordnungen geführt; Vorschau und bestätigte Anwendung decken Versetzung, Wiederholung, Austritt und Wiedereintritt ab.
+- Pflichtveranstaltungsanforderungen können pro Schuljahr/Jahrgang/Track mit Mindestanzahl und Äquivalenzgruppe überwacht werden. Veranstaltungs-Korrekturen und Absagen markieren abhängige Zertifikate automatisch zur Prüfung.
 - Backup-/Restore-Skripte sichern PostgreSQL im Custom-Format, optionale Ablage und löschen nur Backups älter als 30 Tage.
 
 ## Noch keine Produktionsfreigabe
 
 Dieser Branch ist nicht für Echtdaten freigegeben. Vor einer gemeinsamen Freigabe durch BSO-Koordination und Schul-IT fehlen bzw. müssen nachgewiesen werden:
 
-- vollständiger T01–T25-Abnahmetest einschließlich Enrollment-/Schuljahreswechsel, Workshops, Pflichtmonitoring, Rückdatierung und echter Konkurrenz-HTTP-Tests; siehe `docs/TEST_MATRIX.md`;
+- vollständiger T01–T25-Abnahmetest einschließlich echter HTTP-Paralleltests, CSRF-/Berechtigungsmatrix und fachlich befülltem Workshopkatalog; die technischen Endpunkte sind vorhanden, die Nachweise fehlen teilweise noch; siehe `docs/TEST_MATRIX.md`;
 - Backup-/Restore-Test für Datenbank, Dokumentenablage und geschützte Signaturablage;
 - Sicherheits-/Datenschutzprüfung einschließlich Nginx-Vertrauen, Cookie-/Session-Prüfung, Upload-Schutz, Aufbewahrung und Löschkonzept;
-- fachliche Prüfung der Veranstaltungskataloge, Schulbriefkopf- und Signaturfreigabe;
+- fachliche Prüfung der Veranstaltungskataloge sowie Freigabe von Schulbriefkopf und Signatur; die generierten Dokumente enthalten die fiktiven Veranstaltungs-/Praktikumslisten und müssen visuell durch die Schule abgenommen werden;
 - Installation auf einer separaten Testinstanz mit fiktiven Daten und dokumentiertem Rollback.
 
 ## Update und Rollback
@@ -33,7 +35,7 @@ Dieser Branch ist nicht für Echtdaten freigegeben. Vor einer gemeinsamen Freiga
 
 - `git diff --check`: bestanden.
 - `mvn verify`: in der Agent-Umgebung nicht direkt ausführbar, da Maven und Java nicht installiert sind; `mvn test` im Java-21-Maven-Container: bestanden (6 Tests).
-- Docker-Build: bestanden mit Java 21/Maven-Builder. PostgreSQL-Migrationen V1–V4: bestanden in PostgreSQL 17.
+- Docker-Build: bestanden mit Java 21/Maven-Builder. PostgreSQL-Migrationen V1–V5: bestanden in einer frischen isolierten PostgreSQL-17-Compose-Instanz.
 - Separater Compose-Integrationslauf: `/api/health`, Flyway, Login, PDF/DOCX-Ausgabe und geschützter Download bestanden.
 - Backup/Restore-Test auf dem separaten Compose-Volume: bestanden; Schema-Historie und `app_users` nach Restore vorhanden.
 - Vollständiger Testlauf gegen die echte `.env`/Schulserverumgebung: bewusst nicht ausgeführt.

@@ -38,7 +38,10 @@ public class CertificateService {
         payload.put("class",student.get("class_name")); payload.put("grade",grade); payload.put("track",track);
         payload.put("asOf",asOf.toString()); payload.put("coins",coins.toPlainString()); payload.put("level",level.name());
         int certificateId;
-        Integer existing=db.query("SELECT id FROM certificates WHERE student_pk=? AND status='AKTUELL'",rs->{return rs.next()?rs.getInt(1):null;},studentPk);
+        Map<String,Object> existingRow=db.query("SELECT id,status FROM certificates WHERE student_pk=?",rs->{return rs.next()?Map.of("id",rs.getLong("id"),"status",rs.getString("status")):null;},studentPk);
+        if(existingRow!=null && "PRUEFUNG_ERFORDERLICH".equals(existingRow.get("status")) && !newVersion)
+            throw new IllegalArgumentException("Zertifikat muss nach einer Datenkorrektur neu geprüft und versioniert werden");
+        Integer existing=existingRow==null?null:((Long)existingRow.get("id")).intValue();
         if(existing==null) {
             db.update("INSERT INTO certificates(student_pk,status,issued_by) VALUES (?,'AKTUELL',?)",studentPk,actor);
             certificateId=db.queryForObject("SELECT id FROM certificates WHERE student_pk=? AND status='AKTUELL'",Integer.class,studentPk);
@@ -83,9 +86,9 @@ public class CertificateService {
                 y=line(stream,"Hiermit wird bescheinigt:",12,y,false); y=line(stream,"Name: "+payload.get("name"),12,y,false); y=line(stream,"Klasse/Jahrgang: "+payload.get("class")+" / "+payload.get("grade"),12,y,false);
                 y=line(stream,"Bildungsgang: "+payload.get("track"),12,y,false); y-=10; y=line(stream,"Stufe: "+levelText(level),15,y,true); y=line(stream,"Münzstand zum "+asOf+": "+coins+" Münzen",12,y,false); y-=15;
                 y=line(stream,"Veranstaltungen im Stichtagszeitraum:",11,y,true);
-                for(Map<String,Object> event:events(((Number)student.get("id")).longValue(),asOf)) { y=line(stream,event.get("end_date")+" · "+event.get("title")+" · "+event.get("coins")+" Münzen",9,y,false); if(y<110) break; }
+                for(Map<String,Object> event:events(((Number)student.get("id")).longValue(),asOf)) { if(y<125) throw new IllegalArgumentException("Zertifikat enthält zu viele Veranstaltungen für eine Seite"); y=line(stream,event.get("end_date")+" · "+event.get("title")+" · "+event.get("coins")+" Münzen",9,y,false); }
                 y-=8; y=line(stream,"Praktika:",11,y,true);
-                for(Map<String,Object> internship:internships(((Number)student.get("id")).longValue(),asOf)) { y=line(stream,internship.get("kind")+" · "+internship.get("company")+" · "+internship.get("recognized_days")+" Tage · "+internship.get("coins")+" Münzen",9,y,false); if(y<80) break; }
+                for(Map<String,Object> internship:internships(((Number)student.get("id")).longValue(),asOf)) { if(y<95) throw new IllegalArgumentException("Zertifikat enthält zu viele Praktika für eine Seite"); y=line(stream,internship.get("kind")+" · "+internship.get("company")+" · "+internship.get("recognized_days")+" Tage · "+internship.get("coins")+" Münzen",9,y,false); }
                 line(stream,"Ort/Datum: Landstuhl, "+asOf,10,55,false); line(stream,"BSO-Koordination",10,55-18,false);
             }
             document.save(out); return out.toByteArray();
@@ -97,7 +100,10 @@ public class CertificateService {
             XWPFParagraph title=doc.createParagraph(); title.setAlignment(ParagraphAlignment.CENTER); title.createRun().setText(SCHOOL);
             XWPFParagraph heading=doc.createParagraph(); heading.setAlignment(ParagraphAlignment.CENTER); XWPFRun run=heading.createRun(); run.setBold(true); run.setFontSize(18); run.setText("BSO-Zertifikat");
             doc.createParagraph().createRun().setText(SLOGAN);
-            for(String text:List.of("Hiermit wird bescheinigt:","Name: "+payload.get("name"),"Klasse/Jahrgang: "+payload.get("class")+" / "+payload.get("grade"),"Bildungsgang: "+payload.get("track"),"Stufe: "+levelText(level),"Münzstand zum "+asOf+": "+coins+" Münzen","Veranstaltungen und Praktika sind im serverseitigen Snapshot dieser Version enthalten.")) doc.createParagraph().createRun().setText(text);
+            for(String text:List.of("Hiermit wird bescheinigt:","Name: "+payload.get("name"),"Klasse/Jahrgang: "+payload.get("class")+" / "+payload.get("grade"),"Bildungsgang: "+payload.get("track"),"Stufe: "+levelText(level),"Münzstand zum "+asOf+": "+coins+" Münzen","Veranstaltungen:")) doc.createParagraph().createRun().setText(text);
+            for(Map<String,Object> event:events(((Number)student.get("id")).longValue(),asOf)) doc.createParagraph().createRun().setText(event.get("end_date")+" · "+event.get("title")+" · "+event.get("coins")+" Münzen");
+            doc.createParagraph().createRun().setText("Praktika:");
+            for(Map<String,Object> internship:internships(((Number)student.get("id")).longValue(),asOf)) doc.createParagraph().createRun().setText(internship.get("kind")+" · "+internship.get("company")+" · "+internship.get("recognized_days")+" Tage · "+internship.get("coins")+" Münzen");
             doc.createParagraph().createRun().setText("Ort/Datum: Landstuhl, "+asOf+" · BSO-Koordination"); doc.write(out); return out.toByteArray();
         } catch(Exception ex) { throw new IllegalStateException("DOCX konnte nicht erzeugt werden",ex); }
     }
