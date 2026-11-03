@@ -111,7 +111,7 @@ public class XlsxImportController {
                         String eventKind=optional(source,columns,"kind","Art").toUpperCase(Locale.ROOT);
                         if (eventKind.isBlank()) eventKind="WAHLPFLICHT";
                         CoinRules.requireCoinValue(coins,false);
-                        if (title.isBlank() || title.length()>255 || !Set.of("PFLICHT","WAHLPFLICHT","WORKSHOP").contains(eventKind))
+                        if (title.isBlank() || title.length()>255 || !Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(eventKind))
                             throw new IllegalArgumentException("Name oder Veranstaltungsart ungültig");
                         String key=title+"|"+end;
                         if (!keys.add(key)) throw new IllegalArgumentException("Doppelte Veranstaltung in XLSX");
