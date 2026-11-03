@@ -1,0 +1,28 @@
+<!doctype html><html lang="de"><head><meta charset="utf-8"><title>BSO – Benutzerverwaltung</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{font:16px system-ui,Arial,sans-serif;background:#f4f6fa;color:#1b3046;max-width:1000px;margin:30px auto;padding:20px}
+section{background:white;border-radius:12px;padding:22px;margin:18px 0}input,select,button{font:inherit;padding:9px;margin:5px}
+button{background:#173756;color:white;border:0;border-radius:6px;cursor:pointer}
+table{border-collapse:collapse;width:100%}td,th{padding:10px;border-bottom:1px solid #ddd;text-align:left}</style></head>
+<body><h1>BSO – Benutzerverwaltung</h1><p><a href="/">Zurück zur Übersicht</a></p>
+<p id="notice" role="status"></p>
+<section><h2>Lehrkraft / Administration anlegen</h2><form id="newUser">
+<input name="username" placeholder="Benutzername" required>
+<input name="password" type="password" minlength="12" placeholder="Passwort (mind. 12 Zeichen)" required>
+<select name="role"><option value="TEACHER">Lehrkraft</option><option value="ADMIN">Administration</option></select>
+<button>Konto erstellen</button></form></section>
+<section><h2>Konten</h2><table><thead><tr><th>Benutzer</th><th>Rolle</th><th>Aktiv</th><th>Aktion</th></tr></thead><tbody id="users"></tbody></table></section>
+<script>
+let csrf='';
+async function request(path,options={}){options.headers={...(options.headers||{}),'X-XSRF-TOKEN':csrf};
+const r=await fetch(path,options);if(r.status===401||r.redirected){location.href='/login.html';throw Error('Sitzung abgelaufen')}
+if(!r.ok)throw Error('Aktion fehlgeschlagen (HTTP '+r.status+')');return r.json()}
+function cell(tr,t){let d=document.createElement('td');d.textContent=t;tr.append(d);return d}
+async function refresh(){let rows=await request('/api/admin/users');let tbody=document.getElementById('users');tbody.replaceChildren();
+for(let u of rows){let tr=document.createElement('tr');cell(tr,u.username);cell(tr,u.role);cell(tr,u.enabled?'Ja':'Nein');
+let d=cell(tr,'');let reset=document.createElement('button');reset.textContent='Passwort zurücksetzen';
+reset.onclick=async()=>{let p=prompt('Neues Passwort (mind. 12 Zeichen):');if(p===null)return;try{await request('/api/admin/users/'+u.id+'/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({newPassword:p})});alert('Passwort geändert')}catch(e){alert(e.message)}};d.append(reset);
+let en=document.createElement('button');en.textContent=u.enabled?'Deaktivieren':'Aktivieren';en.onclick=async()=>{try{await request('/api/admin/users/'+u.id+'/enabled',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:!u.enabled})});refresh()}catch(e){alert(e.message)}};d.append(en);tbody.append(tr)}}
+document.getElementById('newUser').onsubmit=async e=>{e.preventDefault();let data=Object.fromEntries(new FormData(e.target));try{await request('/api/admin/users',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});e.target.reset();refresh()}catch(ex){document.getElementById('notice').textContent=ex.message}};
+fetch('/api/csrf').then(r=>r.json()).then(v=>{csrf=v.token;refresh()});
+</script></body></html>
