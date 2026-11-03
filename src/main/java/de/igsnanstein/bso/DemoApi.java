@@ -19,7 +19,7 @@ public class DemoApi {
     DemoApi(JdbcTemplate db) { this.db = db; }
 
     public record Student(String studentId, String firstName, String lastName, String className, int grade, String track) {}
-    public record Event(String title, String endDate, BigDecimal coins, Boolean confirmHighValue) {}
+    public record Event(String title, String endDate, BigDecimal coins, Boolean confirmHighValue, String kind, Integer requiredForGrade, String requiredForTrack) {}
     public record Grant(long studentPk, long eventId, BigDecimal coins) {}
 
     @GetMapping("/health")
@@ -65,11 +65,25 @@ public class DemoApi {
             throw bad("Name, Datum und positiver Münzwert in 0,5er-Schritten erforderlich");
         if(e.coins().compareTo(new BigDecimal("20"))>0 && !Boolean.TRUE.equals(e.confirmHighValue()))
             throw bad("Münzwert über 20 benötigt eine ausdrückliche Bestätigung");
+        String kind=e.kind()==null||e.kind().isBlank()?"WAHLPFLICHT":e.kind().trim().toUpperCase(java.util.Locale.ROOT);
+        if(!java.util.Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(kind))
+            throw bad("Veranstaltungsart ungültig");
+        if(kind.equals("PFLICHT") && (e.requiredForGrade()==null || e.requiredForGrade()<7 || e.requiredForGrade()>13))
+            throw bad("Für eine Pflichtveranstaltung muss ein Zieljahrgang von 7 bis 13 angegeben werden");
+        if(e.requiredForTrack()!=null && e.requiredForTrack().length()>30)
+            throw bad("Bildungsgang ungültig");
+        LocalDate endDate;
+        try { endDate=LocalDate.parse(e.endDate()); }
+        catch(Exception ex){ throw bad("Ungültiges Abschlussdatum (JJJJ-MM-TT)"); }
         try {
-            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,'WAHLPFLICHT')",
-               e.title().trim(),e.endDate(),e.coins());
-            audit(auth,"EVENT_CREATE", "event", e.title(), null, e.title()+"/"+e.coins());
-        } catch (Exception ex) { throw bad("Ungültiges Datum oder Veranstaltung bereits vorhanden"); }
+            db.update("INSERT INTO events(title,end_date,coins,kind,required_for_grade,required_for_track) VALUES (?,?,?,?,?,?)",
+               e.title().trim(),endDate,e.coins(),kind,
+               kind.equals("PFLICHT")?e.requiredForGrade():null,
+               kind.equals("PFLICHT") && e.requiredForTrack()!=null && !e.requiredForTrack().isBlank()?e.requiredForTrack().trim():null);
+            audit(auth,"EVENT_CREATE", "event", e.title(), null, e.title()+"/"+e.coins()+"/"+kind);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw bad("Veranstaltung konnte wegen einer Datenbankregel nicht angelegt werden");
+        }
         return Map.of("message","Veranstaltung angelegt");
     }
 
