@@ -15,6 +15,6 @@ Stand 03.11.2026. Fachabnahme ausstehend. Es gibt hochgeladene Referenzen: `BK_K
 
 ## Hinweis zur Bereitstellung der Originalvorlagen
 
-Die auf der ChatGPT-Seite vorhandene bereinigte Vorlage `BSO_Originalbriefkopf_ohne_Unterschrift.docx` bewahrt den originalen DOCX-Header mit Logo und entfernt den privaten Briefinhalt samt Unterschrift. Sie muss vom Betreiber **privat in den Codex-Arbeitsbereich** kopiert werden, falls Codex nicht auf den ursprünglichen Upload zugreifen kann. Kein Geheimnis oder Signatur in GitHub hochladen. Prüfen, ob der originale Schulbriefkopf selbst zur Veröffentlichung freigegeben ist.
+Die auf der ChatGPT-Seite vorhandene bereinigte Vorlage `BSO_Originalbriefkopf_bereinigt.docx` bewahrt den originalen DOCX-Header mit Logo und entfernt den privaten Briefinhalt, die Unterschrift **und die eingebetteten Signatur-Bildbytes**. Sie muss vom Betreiber **privat in den Codex-Arbeitsbereich** kopiert werden, falls Codex nicht auf den ursprünglichen Upload zugreifen kann. Kein Geheimnis oder Signatur in GitHub hochladen. Prüfen, ob der originale Schulbriefkopf selbst zur Veröffentlichung freigegeben ist.
 
 **Abnahmeziel:** Beim Ausdruck derselben zertifizierten Person dürfen DOCX und PDF weder bei Kopf, Farben, Tabellen, Zeilenumbruch noch beim Fuß unterschiedlich aussehen.
