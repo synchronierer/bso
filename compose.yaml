@@ -1,19 +1,33 @@
-m«ë‡±¶¶¨¥êÚÚkŠ{_N¼›jÇºâ¥¥ú+šŠÞŠwè®f­Š‰ÛjÇºáìm­ª)z¶§všâž×Ó¯&Ú±î¸…éi~Šæ¢·¢ú+™«b¢vÚ±î¸{kjŠ^­©Ý¦¸§µôëÉ¶¬{®!zZ_¢¹¨­è§~ŠæjØ¨¶¬{®ÆÚÚ¢—«jwi®)í}:òm«ëˆ^–—è®j+z)ß¢¹š¶*'m«ë‡±¶¶¨¥êÚÚkŠ{_N¼›jÇºâ¥¥ú+šŠÞŠwè®f­Š‰ÛjÇºáìm­ª)z¶§všâž×Ó¯&Ú±î¸…éi~Šæ¢·¢ú+™«b¢vÚ±î¸{kjŠ^­©Ý¦¸§µôëÉ¶¬{®!zZ_¢¹¨­è§~ŠæjØ¨¶¬{®ÆÚÚ¢—«jwi®)í}:òm«ëˆ^–—è®j+z)ß¢¹š¶*'m«ë‡±¶¶¨¥êÚÚkŠ{_N¼›jÇºâ¥¥ú+šŠÞŠwè®f­Š‰ÜXÚØYÙHKšYÜÛ˜[œÝZ[‹˜œÛÎÂ‚š[\ÜÝ]XÈÜ™Ëš[š]š\]\‹˜\K\ÜÙ\[ÛœËŠŽÂš[\Ü˜]˜K›X]šYÑXÚ[X[Âš[\ÜÜ™Ëš[š]š\]\‹˜\K•\ÝÂ‚˜Û\ÜÈÛÚ[”[\Õ\ÝÂˆ\Ý›ÚY›ØÚÜÔÝ\YØZ[][]™[Š
-HÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë›ØÚË”ÑR×ÒKÛÚ[”[\Ë˜›ØÚÑ›Ü‘Ü˜YJL
-JNÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë›ØÚË“Ð‘T”ÕQ‘KÛÚ[”[\Ë˜›ØÚÑ›Ü‘Ü˜YJLJJNÂˆB‚ˆ\Ý›ÚY™\ÚÛÕ\ÙQ^XÝ[ÛÚ[›Ý[™\šY\Ê
-HÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[““Ó‘KÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-ŒLËHŠKK”ˆŠJNÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[”ÕPÐÑTÔËÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-ŒLŽŠKK”ˆŠJNÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[”ÔPÒPSÔÕPÐÑTÔËÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-ŒMLHŠKK”ˆŠJNÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[‘TÕSÕSÓ‹ÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-ŒMÌHŠKK”ˆŠJNÂˆB‚ˆ\Ý›ÚY[šÛ›ÝÛ”[\Ð\™T™]šY]Ô™\]Z\™Y[™Ü˜YU\Y[’\Ó›ÐÙ\YšXØ]J
-HÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[”‘U’QU×Ô‘TURT‘QÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-LŠKK•S’Ó“ÕÓˆŠJNÂˆ\ÜÙ\\]X[ÊÛÚ[”[\Ë“]™[““Ó‘KÛÚ[”[\Ë›]™[›ÜŠ™]ÈšYÑXÚ[X[
-LŠKLË“TÔÈŠJNÂˆB‚ˆ\Ý›ÚY˜[Y\Ó]\Ý™R[”Ý\Ê
-HÂˆ\ÜÙ\YJÛÚ[”[\Ëš\Ò[”Ý\
-™]ÈšYÑXÚ[X[
-ŒŒHŠJJNÂˆ\ÜÙ\˜[ÙJÛÚ[”[\Ëš\Ò[”Ý\
-™]ÈšYÑXÚ[X[
-ŒŒŒHŠJJNÂˆ\ÜÙ\›ÝÜÊ[YØ[\™Ý[Y[^Ù\[Û‹˜Û\ÜËˆ
-
-HOˆÛÚ[”[\Ëœ™\]Z\™PÛÚ[•˜[YJ™]ÈšYÑXÚ[X[
-ŒŠK˜[ÙJJNÂˆBŸB
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bso
+      POSTGRES_USER: bso
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
+    volumes:
+      - bso_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bso -d bso"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+  web:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db: {condition: service_healthy}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/bso
+      SPRING_DATASOURCE_USERNAME: bso
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
+      BSO_ADMIN_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Bitte ADMIN_INITIAL_PASSWORD in .env setzen}
+    ports:
+      - "127.0.0.1:${BSO_PORT:-8081}:8080"
+    networks: [private]
+volumes:
+  bso_db:
+networks:
+  private:
