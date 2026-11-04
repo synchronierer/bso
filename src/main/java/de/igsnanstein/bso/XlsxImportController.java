@@ -53,8 +53,9 @@ public class XlsxImportController {
                     WHERE student_id=?""", row.get("firstName"),row.get("lastName"),row.get("className"),
                     row.get("grade"),row.get("track"),row.get("studentId"));
             } else if ("ADD".equals(row.get("action"))) {
-                db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,?)",
-                    row.get("title"),row.get("endDate"),row.get("coins"),row.get("kind"));
+                db.update("INSERT INTO events(title,end_date,coins,kind,required_for_grade,required_for_track) VALUES (?,CAST(? AS DATE),?,?,?,?)",
+                    row.get("title"),row.get("endDate"),row.get("coins"),row.get("kind"),
+                    row.get("requiredForGrade"),row.get("requiredForTrack"));
             }
             changed++;
         }
@@ -108,14 +109,30 @@ public class XlsxImportController {
                         String title=value(source,columns,"title","Veranstaltung","Name");
                         LocalDate end=LocalDate.parse(value(source,columns,"endDate","Enddatum","Datum"));
                         BigDecimal coins=new BigDecimal(value(source,columns,"coins","Muenzen","Münzen","Münzwert").replace(',','.'));
-                        String eventKind=optional(source,columns,"kind","Art").toUpperCase(Locale.ROOT);
-                        if (eventKind.isBlank()) eventKind="WAHLPFLICHT";
+                        String eventKind=EventKind.parse(value(source,columns,"kind","Art","Veranstaltungsart"));
                         CoinRules.requireCoinValue(coins,false);
-                        if (title.isBlank() || title.length()>255 || !Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(eventKind))
-                            throw new IllegalArgumentException("Name oder Veranstaltungsart ungültig");
+                        if (title.isBlank() || title.length()>255)
+                            throw new IllegalArgumentException("Veranstaltungsname fehlt oder ist zu lang");
+                        String gradeText=optional(source,columns,"requiredForGrade","PflichtJahrgang","Zieljahrgang","Jahrgang");
+                        String trackText=optional(source,columns,"requiredForTrack","PflichtBildungsgang","Zielbildungsgang","Bildungsgang");
+                        Integer requiredForGrade=null;
+                        String requiredForTrack=null;
+                        if("PFLICHT".equals(eventKind)){
+                            if(gradeText.isBlank())throw new IllegalArgumentException("Bei P muss ein Zieljahrgang (7 bis 13) angegeben werden");
+                            requiredForGrade=Integer.valueOf(gradeText);
+                            if(requiredForGrade<7||requiredForGrade>13)throw new IllegalArgumentException("Zieljahrgang muss zwischen 7 und 13 liegen");
+                            if(!trackText.isBlank()){
+                                if(!Set.of("BR","V10","S1","Ü11","MSS").contains(trackText.toUpperCase(Locale.ROOT)))
+                                    throw new IllegalArgumentException("Zielbildungsgang ungültig");
+                                requiredForTrack=trackText.toUpperCase(Locale.ROOT);
+                            }
+                        }else if(!gradeText.isBlank()||!trackText.isBlank()){
+                            throw new IllegalArgumentException("Zieljahrgang und Zielbildungsgang nur für P verwenden");
+                        }
                         String key=title+"|"+end;
                         if (!keys.add(key)) throw new IllegalArgumentException("Doppelte Veranstaltung in XLSX");
                         row.put("title",title);row.put("endDate",end.toString());row.put("coins",coins);row.put("kind",eventKind);
+                        row.put("requiredForGrade",requiredForGrade);row.put("requiredForTrack",requiredForTrack);
                         if (coins.compareTo(new BigDecimal("20")) > 0) row.put("warning","Über 20 Münzen – bestätigungspflichtig");
                         Integer count=db.queryForObject("SELECT COUNT(*) FROM events WHERE title=? AND end_date=?",Integer.class,title,end);
                         action=count!=null&&count>0?"UNCHANGED":"ADD";
