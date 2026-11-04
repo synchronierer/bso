@@ -2,20 +2,20 @@
 
 ## Bedienung (RC1-Testbetrieb)
 
-1. Auf der Startseite unter **Praktikumsblöcke** einen Block mit **Bezeichnung**, **Klasse**, **Art** (Pflicht oder freiwilliges Zusatzpraktikum) sowie **gemeinsamem Beginn und Ende** erstellen.
-2. Block öffnen: Alle aktiven Schülerinnen und Schüler der gewählten Klasse erscheinen in einer Tabelle. Bei den teilnehmenden Personen den **Betrieb** eintragen und **Betriebe vorab speichern** drücken. Alle anderen Zeilen leer lassen. Es entstehen **keine Münzen**.
+1. Auf der Startseite unter **Praktikumsblöcke** einen **klassenübergreifenden Block** mit **Bezeichnung**, **Art** (Pflicht oder freiwilliges Zusatzpraktikum) sowie **gemeinsamem Beginn und Ende** erstellen. **Keine Klasse bei der Blockanlage angeben**.
+2. Block öffnen und erst jetzt über den **Klassenfilter** die jeweilige Klasse auswählen: Alle aktiven Schülerinnen und Schüler dieser Klasse erscheinen in der Tabelle. Dasselbe Praktikumsangebot kann nacheinander für mehrere Klassen verwendet werden. Bei den teilnehmenden Personen den **Betrieb** eintragen und **Betriebe vorab speichern** drücken. Alle anderen Zeilen leer lassen. Es entstehen **keine Münzen**.
 3. Auch nach dem Speichern können noch nicht abgerechnete Betriebe verändert werden. Bereits endgültig angerechnete Einträge sind geschützt.
 4. **Erst nach dem Enddatum** die Zeilen mit bereits gespeicherten Betrieben auswählen, je Person die **anerkannten Tage** prüfen (Pflicht 1–10; Zusatz 1–5) und über **Ausgewählte Praktika endgültig abrechnen** bestätigen. Erst jetzt werden 10 Münzen pro anerkanntem Tag gutgeschrieben.
 5. Teilweise Abrechnung ist möglich: Fehlende Teilnahmen können später geprüft und separat endgültig gebucht werden.
 
 ## Datenhaltung
 
-Flyway V8 ergänzt `internship_blocks` und `internship_placements`. Frühere direkte, endgültig angerechnete Einträge in `internships` bleiben unverändert. Ein Platzierungseintrag speichert zunächst nur Betrieb, Person und die zum Zeitpunkt der Planung offene Schulbesuchsepisode. `recognized_days` und `internship_id` werden erst bei endgültiger Abrechnung gesetzt. `CertificateService` berücksichtigt nach wie vor nur `internships.finalised=true`.
+Flyway V8 ergänzt `internship_blocks` und `internship_placements`; Flyway V9 macht bestehende Blöcke unabhängig von einer festen Klasse. Bei alten Blöcken werden historische Klassenangaben nur erhalten, aber nicht mehr zur Einschränkung verwendet. Frühere direkte, endgültig angerechnete Einträge in `internships` bleiben unverändert. Ein Platzierungseintrag speichert zunächst nur Betrieb, Person und die zum Zeitpunkt der Planung offene Schulbesuchsepisode. `recognized_days` und `internship_id` werden erst bei endgültiger Abrechnung gesetzt. `CertificateService` berücksichtigt nach wie vor nur `internships.finalised=true`.
 
 API:
 - `GET /api/internship-blocks`: Liste aller Blöcke
 - `POST /api/internship-blocks`: Block anlegen
-- `GET /api/internship-blocks/{id}/placements`: Klassenraster
+- `GET /api/internship-blocks/{id}/placements?className=9a`: Klassenraster des globalen Blocks, nach Klasse gefiltert
 - `POST /api/internship-blocks/{id}/placements`: Betriebe für ausgewählte Personen speichern, ohne Münzen
 - `POST /api/internship-blocks/{id}/finalise`: ausgewählte Platzierungen endgültig mit Tagen abrechnen
 
