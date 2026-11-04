@@ -22,14 +22,14 @@ td,th{padding:8px;border-bottom:1px solid #e0e6ee;text-align:left;white-space:no
 <section id="companyImport">
 <h2>Praktikumsbetriebe importieren</h2>
 <p>Eine Liste von Betrieben einmalig importieren und anschließend im Praktikumsblock aus einer Auswahlliste auswählen. <strong>Keine Schüler- oder Münzbuchungen</strong> entstehen durch den Import.</p>
-<p>Spalte: <code>Betrieb</code> (alternativ <code>name</code>, <code>company</code> oder <code>Betriebsname</code>). CSV und XLSX möglich.</p>
+<p>Spalten: <code>Betriebekürzel;Betriebename;Sortiernummer</code>. Die letzten beiden Zusatzangaben Kürzel und Sortierung sind optional, wenn nur eine Namensspalte vorliegt. CSV und XLSX möglich.</p>
 <p><a href="/praktikumsbetriebe-vorlage.csv" download>CSV-Mustervorlage für Praktikumsbetriebe herunterladen</a></p>
 <input type="file" id="companyFile" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <button type="button" id="companyPreview">Betriebsliste prüfen</button>
 <p id="companyMessage" role="status"></p>
 <div id="companyResult" hidden>
 <p id="companyCounts"></p>
-<div class="scroll"><table><thead><tr><th>Zeile</th><th>Status</th><th>Betrieb</th><th>Fehler</th></tr></thead><tbody id="companyRows"></tbody></table></div>
+<div class="scroll"><table><thead><tr><th>Zeile</th><th>Status</th><th>Kürzel</th><th>Betriebsname</th><th>Sortiernummer</th><th>Fehler</th></tr></thead><tbody id="companyRows"></tbody></table></div>
 <button type="button" id="companyConfirm" disabled>Betriebe übernehmen</button>
 <button type="button" id="companyCancel">Abbrechen</button>
 </div>
@@ -91,17 +91,17 @@ el('companyPreview').onclick=async()=>{
  if(!companyImportFile){el('companyMessage').textContent='Bitte eine CSV- oder XLSX-Datei wählen.';return}
  try{
   const preview=await companyPost('preview',companyImportFile);
-  el('companyCounts').textContent='Neu: '+preview.added+' · Bereits vorhanden: '+preview.unchanged+' · Fehler: '+preview.errors;
+  el('companyCounts').textContent='Neu: '+preview.added+' · Aktualisiert: '+preview.updated+' · Bereits vorhanden: '+preview.unchanged+' · Fehler: '+preview.errors;
   el('companyRows').replaceChildren();
   for(const row of preview.rows){
    const tr=document.createElement('tr');
-   for(const field of ['line','action','name','error']){
+   for(const field of ['line','action','shortName','name','sortOrder','error']){
     const td=document.createElement('td');td.textContent=row[field]??'';tr.append(td);
    }
    el('companyRows').append(tr);
   }
   el('companyResult').hidden=false;
-  el('companyConfirm').disabled=preview.errors>0||preview.added===0;
+  el('companyConfirm').disabled=preview.errors>0||(preview.added+preview.updated===0);
   el('companyMessage').textContent='Vorschau erstellt. Es wurde noch kein Betrieb gespeichert.';
  }catch(err){el('companyResult').hidden=true;el('companyMessage').textContent=err.message}
 };
