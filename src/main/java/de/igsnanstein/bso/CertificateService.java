@@ -37,10 +37,11 @@ public class CertificateService {
     private static final PDColor BLACK=new PDColor(new float[]{0f,0f,0f},PDDeviceRGB.INSTANCE);
     private static final PDColor WHITE=new PDColor(new float[]{1f,1f,1f},PDDeviceRGB.INSTANCE);
     private final JdbcTemplate db;
+    private final OdtCertificateRenderer odtRenderer;
     private final String templatePath;
     private final boolean pdfConverterEnabled;
-    CertificateService(JdbcTemplate db,@Value("${bso.certificate.template-path:}") String templatePath,@Value("${bso.certificate.pdf-converter-enabled:true}") boolean pdfConverterEnabled){this.db=db;this.templatePath=templatePath;this.pdfConverterEnabled=pdfConverterEnabled;}
-    public record Generated(long studentPk,String level,byte[] pdf,byte[] docx,int version){}
+    CertificateService(JdbcTemplate db,OdtCertificateRenderer odtRenderer,@Value("${bso.certificate.template-path:}") String templatePath,@Value("${bso.certificate.pdf-converter-enabled:true}") boolean pdfConverterEnabled){this.db=db;this.odtRenderer=odtRenderer;this.templatePath=templatePath;this.pdfConverterEnabled=pdfConverterEnabled;}
+    public record Generated(long studentPk,String level,byte[] pdf,byte[] odt,int version){}
     private record EventLine(String date,String title,BigDecimal coins){}
     private record PracticeLine(String kind,String company,String period,int days,BigDecimal coins){}
     private record Breakdown(String schoolYear,BigDecimal previous,BigDecimal annual,BigDecimal total,List<EventLine> events,List<PracticeLine> practices){}
@@ -55,11 +56,22 @@ public class CertificateService {
         if(existing!=null&&"PRUEFUNG_ERFORDERLICH".equals(existing.get("status"))&&!newVersion)throw new IllegalArgumentException("Zertifikat muss nach einer Korrektur neu geprüft und versioniert werden");
         int certificateId;if(existing==null){db.update("INSERT INTO certificates(student_pk,status,issued_by) VALUES (?,'AKTUELL',?)",studentPk,actor);certificateId=db.queryForObject("SELECT id FROM certificates WHERE student_pk=?",Integer.class,studentPk);}else certificateId=((Long)existing.get("id")).intValue();
         Integer last=db.queryForObject("SELECT COALESCE(MAX(version),0) FROM certificate_versions WHERE certificate_id=?",Integer.class,certificateId);
-        if(last>0&&!newVersion){Map<String,Object> old=db.queryForMap("SELECT level,pdf_data,docx_data,version FROM certificate_versions WHERE certificate_id=? AND version=?",certificateId,last);return new Generated(studentPk,(String)old.get("level"),(byte[])old.get("pdf_data"),(byte[])old.get("docx_data"),(Integer)old.get("version"));}
-        byte[] docx=docx(student,payload,b,level),pdf=pdfConverterEnabled?pdfFromDocx(docx):pdf(student,payload,b,level);String snapshot=toJson(payload);
-        db.update("INSERT INTO certificate_versions(certificate_id,version,as_of,level,snapshot,pdf_data,docx_data) VALUES (?,?,?, ?,CAST(? AS JSONB),?,?)",certificateId,last+1,asOf,level.name(),snapshot,pdf,docx);
+        if(last>0&&!newVersion){
+            Map<String,Object> old=db.queryForMap("SELECT level,pdf_data,docx_data,odt_data,version FROM certificate_versions WHERE certificate_id=? AND version=?",certificateId,last);
+            byte[] odt=(byte[])old.get("odt_data");
+            if(odt==null)odt=convertLegacyDocxToOdt((byte[])old.get("docx_data"));
+            return new Generated(studentPk,(String)old.get("level"),(byte[])old.get("pdf_data"),odt,(Integer)old.get("version"));
+        }
+        List<List<String>> eventRows=new ArrayList<>();
+        for(EventLine line:b.events())eventRows.add(List.of(line.date(),"Veranstaltung",line.title(),line.coins().toPlainString()));
+        List<List<String>> practiceRows=new ArrayList<>();
+        for(PracticeLine line:b.practices())practiceRows.add(List.of(line.period(),line.kind().equals("PFLICHT")?"Pflicht":"Zusatz",line.company(),line.coins().toPlainString()));
+        byte[] odt=odtRenderer.render(String.valueOf(payload.get("name")),String.valueOf(payload.get("class")),
+            b.total().toPlainString(),levelText(level),asOf,eventRows,practiceRows);
+        byte[] pdf=convertOffice(odt,"odt","pdf");String snapshot=toJson(payload);
+        db.update("INSERT INTO certificate_versions(certificate_id,version,as_of,level,snapshot,pdf_data,odt_data) VALUES (?,?,?, ?,CAST(? AS JSONB),?,?)",certificateId,last+1,asOf,level.name(),snapshot,pdf,odt);
         db.update("INSERT INTO audit_events(actor,action,object_type,object_id,before_json,after_json) VALUES (?,?,?, ?,CAST('null' AS JSONB),CAST(? AS JSONB))",actor,"CERTIFICATE_ISSUE","certificate",Long.toString(certificateId),snapshot);
-        return new Generated(studentPk,level.name(),pdf,docx,last+1);
+        return new Generated(studentPk,level.name(),pdf,odt,last+1);
     }
 
     private Map<String,Object> student(long pk){List<Map<String,Object>> rows=db.queryForList("SELECT id,student_id,first_name,last_name,class_name,grade,track FROM students WHERE id=? AND active=true",pk);if(rows.isEmpty())throw new IllegalArgumentException("Schüler nicht vorhanden oder archiviert");return rows.get(0);}
@@ -87,7 +99,35 @@ public class CertificateService {
 
     private byte[] docx(Map<String,Object> student,Map<String,Object> p,Breakdown b,CoinRules.Level level){try(XWPFDocument doc=templateDocument();ByteArrayOutputStream out=new ByteArrayOutputStream()){boolean originalTemplate=templatePath!=null&&!templatePath.isBlank();if(!originalTemplate)setMargins(doc);if(!originalTemplate){XWPFParagraph header=doc.createParagraph();header.setAlignment(ParagraphAlignment.CENTER);XWPFRun h=header.createRun();h.setBold(true);h.setFontFamily(FONT);h.setFontSize(20);h.setColor("123153");h.setText(SCHOOL);XWPFRun sub=header.createRun();sub.addBreak();sub.setFontFamily(FONT);sub.setFontSize(9);sub.setText(ADDRESS);sub.addBreak();sub.setText(CONTACT);}XWPFParagraph slogan=doc.createParagraph();slogan.setAlignment(ParagraphAlignment.CENTER);XWPFRun sr=slogan.createRun();sr.setItalic(true);sr.setFontFamily(FONT);sr.setColor("B38A2E");sr.setText(SLOGAN);XWPFParagraph title=doc.createParagraph();title.setAlignment(ParagraphAlignment.CENTER);XWPFRun tr=title.createRun();tr.setBold(true);tr.setFontFamily(FONT);tr.setFontSize(22);tr.setColor("123153");tr.setText("BSO-ZERTIFIKAT");XWPFParagraph intro=doc.createParagraph();intro.setAlignment(ParagraphAlignment.CENTER);intro.createRun().setText("Hiermit wird bescheinigt");addDetails(doc,p,b,level);addHeading(doc,"Veranstaltungen im Schuljahr "+b.schoolYear());addEventTable(doc,b.events());addHeading(doc,"Praktika");addPracticeTable(doc,b.practices());XWPFParagraph foot=doc.createParagraph();foot.setSpacingBefore(360);foot.createRun().setText("Landstuhl, den "+formatDate((LocalDate)p.get("asOf")));foot.createRun().addBreak();foot.createRun().setText("Unterschrift BSO-Koordination: ____________________________________");doc.write(out);return out.toByteArray();}catch(Exception ex){throw new IllegalStateException("DOCX konnte nicht erzeugt werden",ex);}}
     private XWPFDocument templateDocument() throws IOException {if(templatePath==null||templatePath.isBlank())return new XWPFDocument();Path path=Path.of(templatePath);if(!Files.isRegularFile(path))throw new IOException("Zertifikatsvorlage nicht gefunden: "+path);XWPFDocument doc=new XWPFDocument(Files.newInputStream(path));for(int i=doc.getBodyElements().size()-1;i>=0;i--){var element=doc.getBodyElements().get(i);if(element instanceof XWPFParagraph paragraph){for(int r=paragraph.getRuns().size()-1;r>=0;r--)paragraph.removeRun(r);}else doc.removeBodyElement(i);}return doc;}
-    private byte[] pdfFromDocx(byte[] docx){Path dir=null;try{dir=Files.createTempDirectory("bso-certificate-");Path input=dir.resolve("certificate.docx");Path profile=dir.resolve("lo-profile");Files.createDirectories(profile);Files.write(input,docx);Process process=new ProcessBuilder("libreoffice","-env:UserInstallation="+profile.toUri(),"--headless","--nologo","--nodefault","--nofirststartwizard","--convert-to","pdf:writer_pdf_Export","--outdir",dir.toString(),input.toString()).redirectErrorStream(true).start();if(!process.waitFor(30,TimeUnit.SECONDS)){process.destroyForcibly();throw new IllegalStateException("DOCX-PDF-Konvertierung überschreitet 30 Sekunden");}if(process.exitValue()!=0)throw new IllegalStateException("DOCX-PDF-Konvertierung fehlgeschlagen");Path output=dir.resolve("certificate.pdf");if(!Files.isRegularFile(output))throw new IllegalStateException("DOCX-PDF-Konverter erzeugte keine PDF-Datei");return Files.readAllBytes(output);}catch(InterruptedException ex){Thread.currentThread().interrupt();throw new IllegalStateException("DOCX-PDF-Konvertierung unterbrochen",ex);}catch(IOException ex){throw new IllegalStateException("DOCX-PDF-Konverter nicht verfügbar",ex);}finally{if(dir!=null)try(Stream<Path> paths=Files.walk(dir)){paths.sorted(Comparator.reverseOrder()).forEach(path->{try{Files.deleteIfExists(path);}catch(IOException ignored){}});}catch(IOException ignored){}}}
+    private byte[] convertLegacyDocxToOdt(byte[] original){
+        if(original==null)throw new IllegalStateException("Alte Zertifikatsversion enthält keine ODT/DOCX-Daten");
+        return convertOffice(original,"docx","odt");
+    }
+    private byte[] convertOffice(byte[] bytes,String inputFormat,String outputFormat){
+        Path dir=null;
+        try{
+            dir=Files.createTempDirectory("bso-certificate-");
+            Path input=dir.resolve("certificate."+inputFormat);
+            Path profile=dir.resolve("lo-profile");
+            Files.createDirectories(profile);Files.write(input,bytes);
+            String filter=outputFormat.equals("pdf")?"pdf:writer_pdf_Export":outputFormat;
+            Process process=new ProcessBuilder("libreoffice","-env:UserInstallation="+profile.toUri(),
+                "--headless","--nologo","--nodefault","--nofirststartwizard",
+                "--convert-to",filter,"--outdir",dir.toString(),input.toString())
+                .redirectErrorStream(true).start();
+            if(!process.waitFor(30,TimeUnit.SECONDS)){
+                process.destroyForcibly();throw new IllegalStateException("Zertifikatskonvertierung dauert länger als 30 Sekunden");
+            }
+            if(process.exitValue()!=0)throw new IllegalStateException("Zertifikatskonvertierung fehlgeschlagen");
+            Path output=dir.resolve("certificate."+outputFormat);
+            if(!Files.isRegularFile(output))throw new IllegalStateException("Konverter erzeugte keine "+outputFormat+"-Datei");
+            return Files.readAllBytes(output);
+        }catch(InterruptedException ex){Thread.currentThread().interrupt();throw new IllegalStateException("Zertifikatskonvertierung unterbrochen",ex);}
+        catch(IOException ex){throw new IllegalStateException("Zertifikatskonverter nicht verfügbar",ex);}
+        finally{if(dir!=null)try(Stream<Path> paths=Files.walk(dir)){
+            paths.sorted(Comparator.reverseOrder()).forEach(path->{try{Files.deleteIfExists(path);}catch(IOException ignored){}});
+        }catch(IOException ignored){}}
+    }
     private void setMargins(XWPFDocument doc){var body=doc.getDocument().getBody();var sect=body.isSetSectPr()?body.getSectPr():body.addNewSectPr();var pg=sect.isSetPgMar()?sect.getPgMar():sect.addNewPgMar();pg.setTop(650);pg.setBottom(650);pg.setLeft(900);pg.setRight(900);}
     private void addDetails(XWPFDocument doc,Map<String,Object> p,Breakdown b,CoinRules.Level level){XWPFTable t=doc.createTable(6,4);String[][] x={{"Name",String.valueOf(p.get("name")),"Klasse",String.valueOf(p.get("class"))},{"Jahrgang",String.valueOf(p.get("grade")),"Bildungsgang",String.valueOf(p.get("track"))},{"Stichtag",formatDate((LocalDate)p.get("asOf")),"Schuljahr",b.schoolYear()},{"Zertifikatsstufe",levelText(level),"", ""},{"Vorjahresmünzen",b.previous().toPlainString(),"Jahresmünzen",b.annual().toPlainString()},{"Gesamtmünzen",b.total().toPlainString(),"", ""}};for(int r=0;r<x.length;r++)for(int c=0;c<4;c++)setCell(t.getRow(r).getCell(c),x[r][c],c%2==0);}
     private void addHeading(XWPFDocument doc,String value){XWPFParagraph p=doc.createParagraph();p.setSpacingBefore(180);XWPFRun r=p.createRun();r.setBold(true);r.setFontFamily(FONT);r.setColor("123153");r.setText(value.toUpperCase(Locale.ROOT));}
