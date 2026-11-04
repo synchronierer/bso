@@ -65,6 +65,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <label>Schüler nach Klasse filtern<select id="internshipBlockClassFilter" required></select></label>
 <button type="button" id="internshipBlockReload">Block öffnen</button>
 </form>
+<p>Praktikumsbetrieb aus dem <strong>Betriebskatalog</strong> auswählen. Neue Betriebe können unter <a href="/import.html">CSV-/Excel-Import → Praktikumsbetriebe</a> importiert werden.</p>
 <p id="internshipBlockNotice" role="status"></p>
 <div style="overflow-x:auto"><table><thead><tr><th>Bestätigen</th><th>Schülerin / Schüler</th><th>Betrieb (vorab eintragen)</th><th>Anerkannte Tage (nach Abschluss)</th><th>Status</th></tr></thead><tbody id="internshipBlockRows"></tbody></table></div>
 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -78,7 +79,7 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <form id="internshipForm">
 <label>Schülerin / Schüler<select name="studentPk" id="internshipStudent" required></select></label>
 <label>Art<select name="kind" id="internshipKind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
-<label>Betrieb<input name="company" maxlength="200" required></label>
+<label>Betrieb<select name="company" id="internshipCompanySingle" required></select></label>
 <label>Beginn<input name="startsOn" type="date" required></label>
 <label>Ende<input name="endsOn" type="date" required></label>
 <label>Anerkannte Tage<input name="recognizedDays" type="number" id="internshipDays" min="1" max="10" step="1" value="10" required></label>
@@ -165,6 +166,14 @@ $('eventKind').onchange=()=>{
  $('eventGradeLabel').hidden=!isRequired;$('eventTrackLabel').hidden=!isRequired;
  $('eventGrade').required=isRequired;
 };
+let internshipCompanies=[];
+async function refreshInternshipCompanies(){
+ internshipCompanies=await api('internship-companies');
+ const single=$('internshipCompanySingle'),selected=single.value;
+ single.replaceChildren();opt(single,'','Bitte Betrieb auswählen');
+ for(const company of internshipCompanies)opt(single,company.name,company.name);
+ if(internshipCompanies.some(company=>company.name===selected))single.value=selected;
+}
 let internshipBlocks=[];
 let currentInternshipBlock=null;
 async function refreshInternshipBlocks(chooseId){
@@ -191,8 +200,13 @@ async function openInternshipBlock(){
   const tdCheck=document.createElement('td'),checkbox=document.createElement('input');
   checkbox.type='checkbox';checkbox.className='ib-check';checkbox.disabled=!r.placementId||!!r.internshipId||!endReached;tdCheck.append(checkbox);tr.append(tdCheck);
   cell(tr,r.lastName+', '+r.firstName);
-  const tdCompany=document.createElement('td'),company=document.createElement('input');
-  company.className='ib-company';company.maxLength=200;company.value=r.company||'';company.placeholder='Betrieb eintragen';company.disabled=!!r.internshipId;
+  const tdCompany=document.createElement('td'),company=document.createElement('select');
+  company.className='ib-company';company.disabled=!!r.internshipId;
+  opt(company,'','Bitte Betrieb auswählen');
+  // Older placement records retain their historical company text.
+  if(r.company&&!internshipCompanies.some(c=>c.name===r.company))opt(company,r.company,r.company+' (bisheriger Eintrag)');
+  for(const companyItem of internshipCompanies)opt(company,companyItem.name,companyItem.name);
+  company.value=r.company||'';
   tdCompany.append(company);tr.append(tdCompany);
   const tdDays=document.createElement('td'),days=document.createElement('input');
   days.className='ib-days';days.type='number';days.min='1';days.max=currentInternshipBlock.kind==='PFLICHT'?'10':'5';days.step='1';days.value=String(r.recognizedDays|| (currentInternshipBlock.kind==='PFLICHT'?10:5));days.disabled=!!r.internshipId||!endReached;
@@ -309,5 +323,5 @@ $('certificateZip').onclick=()=>{
  location.href='/api/certificates/class/'+encodeURIComponent(c)+'.zip?onlyValid=true&asOf='+encodeURIComponent($('certificateDate').value);
 };
 $('certificateDate').value=new Date().toLocaleDateString('en-CA');
-sessionInit().then(refresh).then(()=>Promise.all([certificateStatus(),refreshInternshipBlocks()])).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
+sessionInit().then(refresh).then(()=>Promise.all([certificateStatus(),refreshInternshipCompanies()])).then(refreshInternshipBlocks).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
 </script></body></html>
