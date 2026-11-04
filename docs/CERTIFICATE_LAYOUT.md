@@ -1,6 +1,6 @@
 # Zertifikatslayout RC1
 
-Die im Branch genannten Dateien `BK_Kania.docx` und `ZertifikatVorlage.docx` waren im Arbeitsbereich nicht vorhanden und konnten daher nicht unverändert eingebettet werden. Es wurden keine unbekannten Logos, Briefkopfdateien oder Signaturgrafiken erfunden.
+Die im Branch genannten Dateien `BK_Kania.docx`, `ZertifikatVorlage.docx`, `CERTIFICATE_LAYOUT_ORIGINAL.md` und `BSO_Originalbriefkopf_bereinigt.docx` waren im Arbeitsbereich nicht vorhanden und konnten daher nicht unverändert eingebettet werden. Es wurden keine unbekannten Logos, Briefkopfdateien oder Signaturgrafiken erfunden.
 
 Die Ausgabe verwendet deshalb eine zentrale Layoutdefinition in `CertificateService`:
 
@@ -11,6 +11,8 @@ Die Ausgabe verwendet deshalb eine zentrale Layoutdefinition in `CertificateServ
 - Vorjahresmünzen, Jahresmünzen und Gesamtmünzen des aktuellen Blocks;
 - Stichtag, Schuljahr, Zertifikatsstufe, Slogan und Unterschriftszeile;
 - PDF-Ausgabe bricht bei Überschreitung des Satzspiegels mit einem Layoutfehler ab, statt Inhalte abzuschneiden.
+- Sämtliche sichtbaren Datumsangaben werden mit ausgeschriebenen deutschen Monatsnamen formatiert; die Schlusszeile lautet dynamisch `Landstuhl, den <Tag>. <Monat> <Jahr>`.
+- Die frühere Bezeichnung `Ort/Datum` wird nicht mehr ausgegeben.
 
 ## Qualitätssicherung
 
