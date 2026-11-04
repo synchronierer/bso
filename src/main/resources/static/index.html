@@ -171,7 +171,7 @@ async function refreshInternshipCompanies(){
  internshipCompanies=await api('internship-companies');
  const single=$('internshipCompanySingle'),selected=single.value;
  single.replaceChildren();opt(single,'','Bitte Betrieb auswählen');
- for(const company of internshipCompanies)opt(single,company.name,company.name);
+ for(const company of internshipCompanies)opt(single,company.name,company.shortName===company.name?company.name:company.shortName+' – '+company.name);
  if(internshipCompanies.some(company=>company.name===selected))single.value=selected;
 }
 let internshipBlocks=[];
@@ -205,7 +205,7 @@ async function openInternshipBlock(){
   opt(company,'','Bitte Betrieb auswählen');
   // Older placement records retain their historical company text.
   if(r.company&&!internshipCompanies.some(c=>c.name===r.company))opt(company,r.company,r.company+' (bisheriger Eintrag)');
-  for(const companyItem of internshipCompanies)opt(company,companyItem.name,companyItem.name);
+  for(const companyItem of internshipCompanies)opt(company,companyItem.name,companyItem.shortName===companyItem.name?companyItem.name:companyItem.shortName+' – '+companyItem.name);
   company.value=r.company||'';
   tdCompany.append(company);tr.append(tdCompany);
   const tdDays=document.createElement('td'),days=document.createElement('input');
