@@ -145,10 +145,12 @@ function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.t
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
  const [students,events]=await Promise.all([api('students'),api('events')]);
+ const previousClassFilter=$('internshipBlockClassFilter').value;
  $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();$('internshipStudent').replaceChildren();$('internshipBlockClassFilter').replaceChildren();opt($('internshipBlockClassFilter'),'','Klasse auswählen');
  const classes=new Set();
  for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');opt($('internshipStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');classes.add(s.className)}
  for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))){opt($('certificateClass'),c,c);opt($('internshipBlockClassFilter'),c,c);}
+ if([...classes].includes(previousClassFilter))$('internshipBlockClassFilter').value=previousClassFilter;
  for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
 }
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
