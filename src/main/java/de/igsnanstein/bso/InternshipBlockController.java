@@ -75,6 +75,7 @@ public class InternshipBlockController {
     @Transactional
     public Map<String,Object> save(@PathVariable long id,@RequestBody SavePlacements request,Authentication auth) {
         Map<String,Object> block=block(id);
+        db.queryForObject("SELECT id FROM internship_blocks WHERE id=? FOR UPDATE",Long.class,id);
         if(request==null||request.entries()==null||request.entries().isEmpty()||request.entries().size()>300)
             throw bad("Bitte mindestens einen Schüler mit Betrieb eintragen");
         Set<Long> seen=new HashSet<>();
@@ -153,12 +154,12 @@ public class InternshipBlockController {
 
     private Map<String,Object> block(long id){
         return db.query("SELECT id,title,class_name,kind,starts_on,ends_on FROM internship_blocks WHERE id=?",
-            rs->{if(!rs.next())return null;Map<String,Object> m=new HashMap<>();
+            rs->{if(!rs.next())throw bad("Praktikumsblock nicht gefunden");
+                Map<String,Object> m=new HashMap<>();
                 m.put("id",rs.getLong(1));m.put("title",rs.getString(2));m.put("class_name",rs.getString(3));
-                m.put("kind",rs.getString(4));m.put("starts_on",rs.getDate(5));m.put("ends_on",rs.getDate(6));return m;},id)==null
-            ? failBlock():db.queryForMap("SELECT id,title,class_name,kind,starts_on,ends_on FROM internship_blocks WHERE id=?",id);
+                m.put("kind",rs.getString(4));m.put("starts_on",rs.getDate(5));m.put("ends_on",rs.getDate(6));
+                return m;},id);
     }
-    private Map<String,Object> failBlock(){throw bad("Praktikumsblock nicht gefunden");}
     private boolean blank(String s){return s==null||s.isBlank();}
     private LocalDate parse(String value){try{return LocalDate.parse(value);}catch(Exception ex){throw bad("Datum ungültig (JJJJ-MM-TT)");}}
     private void audit(Authentication auth,String action,String value){
