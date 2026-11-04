@@ -9,15 +9,15 @@ header p{margin-bottom:0}.warning{background:#fff1d8;border-left:5px solid #d28b
 section{background:white;padding:20px;border-radius:12px;margin:15px 0;box-shadow:0 2px 8px #0a254010}
 form{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
 input,select,button{font:inherit;border-radius:7px;padding:10px;border:1px solid #bac6d3}
-button{background:#173756;color:white;cursor:pointer;border:0}button:hover{background:#295b86}
+button{background:#173756;color:white;cursor:pointer;border:0}button:not(:disabled):hover{background:#295b86}button:disabled{background:#a6b2bd;color:#f7f9fb;cursor:not-allowed;opacity:.75}
 table{border-collapse:collapse;width:100%}th,td{padding:9px;border-bottom:1px solid #e4eaf0;text-align:left}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6c7c}
 #notice{padding:10px;min-height:20px}
 </style></head><body>
 <header><h1>BSO-Münzverwaltung</h1><p>Integrierte Gesamtschule Am Nanstein · Technische Demoversion</p></header>
-<div class="warning"><strong>Nur Demo:</strong> Anmeldung vorhanden, aber noch kein HTTPS und keine vollständigen BSO-Sonderregeln. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
+<div class="warning"><strong>RC1-Testbetrieb:</strong> Die fachliche, technische und datenschutzrechtliche Freigabe für Echtdaten steht noch aus. <strong>Ausschließlich fiktive Schülerdaten verwenden!</strong> Nicht für den Echtbetrieb freigeben.</div>
 <nav style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-<span id="signedIn"></span><a href="/import.html">CSV-Import</a><a href="/roster.html">Klassenraster</a><a id="adminLink" href="/admin.html" style="display:none">Benutzerverwaltung</a>
+<span id="signedIn"></span><a href="/import.html">CSV/XLSX-Import</a><a href="/roster.html">Klassenraster</a><a href="#certificates">Zertifikate</a><a id="adminLink" href="/admin.html" style="display:none">Benutzerverwaltung</a>
 <button id="changePassword" type="button">Passwort ändern</button>
 <button id="logout" type="button">Abmelden</button></nav>
 <div id="idleWarning" class="warning" hidden>Du wirst in 2 Minuten wegen Inaktivität abgemeldet. <button id="stay" type="button">Weiterarbeiten</button></div>
@@ -39,14 +39,78 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <section><h2>Veranstaltung anlegen</h2>
 <form id="eventForm"><label>Veranstaltung<input name="title" placeholder="Bewerbungstraining" required></label>
 <label>Abschlussdatum<input name="endDate" type="date" required></label>
-<label>Münzwert<input name="coins" type="number" min="0.5" max="20" step="0.5" value="2" required></label>
-<button>Veranstaltung anlegen</button></form></section>
+<label>Münzwert<input name="coins" type="number" min="0.5" step="0.5" value="2" required></label>
+<label>Veranstaltungsart<select name="kind" id="eventKind"><option value="WAHLPFLICHT">Wahlpflicht</option><option value="PFLICHT">Pflicht</option><option value="WAHL">Wahlveranstaltung</option><option value="WORKSHOP">Netzwerkpartner-Workshop</option></select></label>
+<label id="eventGradeLabel" hidden>Pflicht für Jahrgang<select name="requiredForGrade" id="eventGrade"><option value="">Jahrgang wählen</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option></select></label>
+<label id="eventTrackLabel" hidden>Pflicht für Bildungsgang<select name="requiredForTrack"><option value="">Alle Bildungsgänge des Jahrgangs</option><option>BR</option><option>V10</option><option>S1</option><option>Ü11</option><option>MSS</option></select></label>
+<button>Veranstaltung anlegen</button></form>
+<small>Für Praktika bitte die separate Praktikumserfassung verwenden (10 Münzen je anerkanntem Tag, maximal 100 im Pflichtpraktikum).</small></section>
 <section><h2>Einzelne Münzvergabe (optional)</h2>
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
 <label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
 <label>Münzen<input type="number" name="coins" value="2" min="0" step="0.5" required></label>
-<button>Endgültig verbuchen</button></form><small>Im Prototyp werden Münzen sofort verbucht; Entwurfsspeicherung folgt später.</small></section>
-<section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, noch keine getrennten Münzblöcke oder Zertifikatsstufen.</small></section>
+<button>Endgültig verbuchen</button></form><small>Entwürfe im <a href="/roster.html">Klassenraster</a> speichern.</small></section>
+<section id="internships">
+<h2>Praktikumsblöcke – vorher planen, danach Münzen vergeben</h2>
+<p><strong>Schritt 1:</strong> Klassenübergreifenden Block mit gemeinsamem Zeitraum anlegen. <strong>Schritt 2:</strong> Für Schülerinnen und Schüler die Betriebe eintragen und speichern. <strong>Schritt 3:</strong> Erst nach dem Praktikumsende anerkannte Tage prüfen und Münzen endgültig vergeben.</p>
+<form id="internshipBlockForm">
+<label>Bezeichnung<input name="title" placeholder="Betriebspraktikum November 2026" maxlength="200" required></label>
+<label>Art<select name="kind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
+<label>Beginn<input name="startsOn" type="date" required></label>
+<label>Ende<input name="endsOn" type="date" required></label>
+<button type="submit">Praktikumsblock anlegen</button>
+</form>
+<form id="internshipBlockSelection" onsubmit="return false">
+<label>Vorhandenen Block öffnen<select id="internshipBlockSelect"></select></label>
+<label>Schüler nach Klasse filtern<select id="internshipBlockClassFilter" required></select></label>
+<button type="button" id="internshipBlockReload">Block öffnen</button>
+</form>
+<p>Praktikumsbetrieb aus dem <strong>Betriebskatalog</strong> auswählen. Neue Betriebe können unter <a href="/import.html">CSV-/Excel-Import → Praktikumsbetriebe</a> importiert werden.</p>
+<p id="internshipBlockNotice" role="status"></p>
+<div style="overflow-x:auto"><table><thead><tr><th>Bestätigen</th><th>Schülerin / Schüler</th><th>Betrieb (vorab eintragen)</th><th>Anerkannte Tage (nach Abschluss)</th><th>Status</th></tr></thead><tbody id="internshipBlockRows"></tbody></table></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+<button type="button" id="internshipBlockSave">Betriebe vorab speichern</button>
+<button type="button" id="internshipBlockFinalise">Ausgewählte Praktika endgültig abrechnen</button>
+</div>
+<p><small>Ein gespeicherter Vorabeintrag zählt <strong>0 Münzen</strong>, bis die Münzvergabe nach Ende des Blocks ausdrücklich bestätigt wird. Pflichtpraktika: mehrere pro Schuljahr und Münzblock möglich, jeweils maximal 100 Münzen (10 Münzen pro anerkanntem Tag). Zusatzpraktikum maximal 50 Münzen und weiterhin nur einmal pro Schuljahr.</small></p>
+<details><summary>Einzelnes bereits abgeschlossenes Praktikum nachtragen</summary>
+<h3>Einzelnachtrag</h3>
+<p>Praktika werden separat abgerechnet. Pflichtpraktika: mehrfach möglich, jeweils höchstens 10 anerkannte Tage bzw. 100 Münzen. Freiwilliges Zusatzpraktikum: einmal je Schuljahr, höchstens 5 Tage bzw. 50 Münzen.</p>
+<form id="internshipForm">
+<label>Schülerin / Schüler<select name="studentPk" id="internshipStudent" required></select></label>
+<label>Art<select name="kind" id="internshipKind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
+<label>Betrieb<select name="company" id="internshipCompanySingle" required></select></label>
+<label>Beginn<input name="startsOn" type="date" required></label>
+<label>Ende<input name="endsOn" type="date" required></label>
+<label>Anerkannte Tage<input name="recognizedDays" type="number" id="internshipDays" min="1" max="10" step="1" value="10" required></label>
+<button type="submit">Praktikum endgültig verbuchen</button>
+</form>
+<p id="internshipNotice" role="status"></p>
+<small>Diese Einzelbuchung vergibt sofort Münzen und ist nur für bereits abgeschlossene Praktika vorgesehen.</small>
+</details>
+</section>
+<section id="certificates">
+<h2>Zertifikate</h2>
+<p>Schüler auswählen und Münzstand sowie Zertifikatsberechtigung prüfen. Ein Zertifikat ist erst ab der vorgeschriebenen Münzgrenze möglich.</p>
+<form onsubmit="return false">
+<label>Schülerin / Schüler <select id="certificateStudent" required></select></label>
+<label>Stichtag <input id="certificateDate" type="date" required></label>
+<button id="certificateCheck" type="button">Status prüfen</button>
+</form>
+<p id="certificateStatus" role="status">Bitte eine Schülerin oder einen Schüler wählen.</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button id="certificatePdf" type="button" disabled>PDF herunterladen</button>
+<button id="certificateDocx" type="button" disabled>DOCX herunterladen</button>
+<button id="certificateNewVersion" type="button" disabled>Neue Zertifikatsversion erstellen (PDF)</button>
+</div>
+<hr>
+<h3>Klassenweise Zertifikate</h3>
+<p><small>ZIP mit Einzel-PDF, Einzel-DOCX und Sammel-PDF für berechtigte Personen. Noch nicht berechtigte Personen werden ausgelassen.</small></p>
+<form onsubmit="return false"><label>Klasse <select id="certificateClass"></select></label>
+<button id="certificateZip" type="button">Klassen-ZIP herunterladen</button></form>
+<p id="certificateClassStatus" role="status"></p>
+</section>
+<section><h2>Klassenübersicht</h2><div style="overflow:auto"><table><thead><tr><th>ID</th><th>Nachname</th><th>Vorname</th><th>Klasse</th><th>Jahrgang</th><th>Bildungsgang</th><th>Münzen*</th></tr></thead><tbody id="rows"></tbody></table></div><small>* Demonstrationssumme, Für verbindliche Salden und Zertifikatsstufen bitte die Zertifikatsprüfung verwenden.</small></section>
 <script>
 const $=id=>document.getElementById(id);
 let csrfToken='';let lastActivity=Date.now();
@@ -82,18 +146,182 @@ function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.t
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
  const [students,events]=await Promise.all([api('students'),api('events')]);
- $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();
- for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')')}
+ const previousClassFilter=$('internshipBlockClassFilter').value;
+ $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();$('internshipStudent').replaceChildren();$('internshipBlockClassFilter').replaceChildren();opt($('internshipBlockClassFilter'),'','Klasse auswählen');
+ const classes=new Set();
+ for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');opt($('internshipStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');classes.add(s.className)}
+ for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))){opt($('certificateClass'),c,c);opt($('internshipBlockClassFilter'),c,c);}
+ if([...classes].includes(previousClassFilter))$('internshipBlockClassFilter').value=previousClassFilter;
  for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
 }
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
  ev.preventDefault();const data=Object.fromEntries(new FormData(ev.target).entries());
- if(prepare)prepare(data);
+ if(prepare && prepare(data)===false)return;
  try{const response=await api(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});$('notice').textContent=response.message;await refresh()}
  catch(e){$('notice').textContent=e.message}
 })}
 bind('studentForm','students',d=>d.grade=Number(d.grade));
-bind('eventForm','events',d=>d.coins=Number(d.coins));
+$('eventKind').onchange=()=>{
+ const isRequired=$('eventKind').value==='PFLICHT';
+ $('eventGradeLabel').hidden=!isRequired;$('eventTrackLabel').hidden=!isRequired;
+ $('eventGrade').required=isRequired;
+};
+let internshipCompanies=[];
+async function refreshInternshipCompanies(){
+ internshipCompanies=await api('internship-companies');
+ const single=$('internshipCompanySingle'),selected=single.value;
+ single.replaceChildren();opt(single,'','Bitte Betrieb auswählen');
+ for(const company of internshipCompanies)opt(single,company.name,company.shortName===company.name?company.name:company.shortName+' – '+company.name);
+ if(internshipCompanies.some(company=>company.name===selected))single.value=selected;
+}
+let internshipBlocks=[];
+let currentInternshipBlock=null;
+async function refreshInternshipBlocks(chooseId){
+ internshipBlocks=await api('internship-blocks');
+ const sel=$('internshipBlockSelect'),previous=String(chooseId||sel.value||'');
+ sel.replaceChildren();
+ for(const block of internshipBlocks)opt(sel,block.id,block.title+' · '+block.startsOn+' – '+block.endsOn+' ('+block.finalised+'/'+block.placements+' abgerechnet)');
+ if(internshipBlocks.some(block=>String(block.id)===previous))sel.value=previous;
+ await openInternshipBlock();
+}
+async function openInternshipBlock(){
+ const id=$('internshipBlockSelect').value;
+ const klass=$('internshipBlockClassFilter').value;
+ currentInternshipBlock=internshipBlocks.find(b=>String(b.id)===id);
+ $('internshipBlockRows').replaceChildren();
+ $('internshipBlockSave').disabled=true;$('internshipBlockFinalise').disabled=true;
+ if(!currentInternshipBlock){$('internshipBlockNotice').textContent='Bitte einen Praktikumsblock auswählen.';return}
+ if(!klass){$('internshipBlockNotice').textContent='Bitte die Klasse auswählen, deren Schülerinnen und Schüler du bearbeiten möchtest.';return}
+ const rows=await api('internship-blocks/'+encodeURIComponent(id)+'/placements?className='+encodeURIComponent(klass));
+ $('internshipBlockSave').disabled=false;
+ const endReached=currentInternshipBlock.endsOn<=new Date().toLocaleDateString('en-CA');
+ for(const r of rows){
+  const tr=document.createElement('tr');tr.dataset.placementId=r.placementId||'';tr.dataset.studentPk=r.studentPk;
+  const tdCheck=document.createElement('td'),checkbox=document.createElement('input');
+  checkbox.type='checkbox';checkbox.className='ib-check';checkbox.disabled=!r.placementId||!!r.internshipId||!endReached;tdCheck.append(checkbox);tr.append(tdCheck);
+  cell(tr,r.lastName+', '+r.firstName);
+  const tdCompany=document.createElement('td'),company=document.createElement('select');
+  company.className='ib-company';company.disabled=!!r.internshipId;
+  opt(company,'','Bitte Betrieb auswählen');
+  // Older placement records retain their historical company text.
+  if(r.company&&!internshipCompanies.some(c=>c.name===r.company))opt(company,r.company,r.company+' (bisheriger Eintrag)');
+  for(const companyItem of internshipCompanies)opt(company,companyItem.name,companyItem.shortName===companyItem.name?companyItem.name:companyItem.shortName+' – '+companyItem.name);
+  company.value=r.company||'';
+  tdCompany.append(company);tr.append(tdCompany);
+  const tdDays=document.createElement('td'),days=document.createElement('input');
+  days.className='ib-days';days.type='number';days.min='1';days.max=currentInternshipBlock.kind==='PFLICHT'?'10':'5';days.step='1';days.value=String(r.recognizedDays|| (currentInternshipBlock.kind==='PFLICHT'?10:5));days.disabled=!!r.internshipId||!endReached;
+  tdDays.append(days);tr.append(tdDays);
+  cell(tr,r.internshipId?'Endgültig abgerechnet':r.placementId?'Vorgeplant':'Noch nicht eingetragen');
+  $('internshipBlockRows').append(tr);
+ }
+ $('internshipBlockNotice').textContent=currentInternshipBlock.title+': '+rows.length+' Schülerinnen und Schüler. '+(endReached?'Abrechnung jetzt möglich.':'Ende '+currentInternshipBlock.endsOn+' – Münzvergabe noch gesperrt.');
+ $('internshipBlockFinalise').disabled=!endReached;
+}
+$('internshipBlockForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();
+ const d=Object.fromEntries(new FormData(ev.target).entries());
+ try{
+  const r=await api('internship-blocks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  $('internshipBlockNotice').textContent=r.message;
+  await refreshInternshipBlocks(r.id);
+ }catch(e){$('internshipBlockNotice').textContent=e.message}
+});
+$('internshipBlockClassFilter').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
+$('internshipBlockReload').onclick=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
+$('internshipBlockSelect').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
+$('internshipBlockSave').onclick=async()=>{
+ if(!currentInternshipBlock)return;
+ const entries=[...$('internshipBlockRows').children].filter(tr=>!tr.querySelector('.ib-company').disabled&&tr.querySelector('.ib-company').value.trim()).map(tr=>({studentPk:Number(tr.dataset.studentPk),company:tr.querySelector('.ib-company').value.trim()}));
+ if(!entries.length){$('internshipBlockNotice').textContent='Bitte erst mindestens einen Betrieb eintragen.';return}
+ try{
+  const r=await api('internship-blocks/'+currentInternshipBlock.id+'/placements',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entries})});
+  $('internshipBlockNotice').textContent=r.message;
+  await refreshInternshipBlocks(currentInternshipBlock.id);
+ }catch(e){$('internshipBlockNotice').textContent=e.message}
+};
+$('internshipBlockFinalise').onclick=async()=>{
+ if(!currentInternshipBlock)return;
+ const selected=[...$('internshipBlockRows').children].filter(tr=>tr.querySelector('.ib-check').checked);
+ const entries=selected.map(tr=>({placementId:Number(tr.dataset.placementId),recognizedDays:Number(tr.querySelector('.ib-days').value)}));
+ if(!entries.length){$('internshipBlockNotice').textContent='Bitte zunächst die abzurechnenden Praktika auswählen.';return}
+ const max=currentInternshipBlock.kind==='PFLICHT'?10:5;
+ if(entries.some(r=>!Number.isInteger(r.recognizedDays)||r.recognizedDays<1||r.recognizedDays>max)){$('internshipBlockNotice').textContent='Anerkannte Tage müssen zwischen 1 und '+max+' liegen.';return}
+ const total=entries.reduce((n,r)=>n+r.recognizedDays*10,0);
+ if(!confirm(entries.length+' Praktika endgültig abrechnen und insgesamt '+total+' Münzen vergeben? Diese Buchung kann nicht einfach zurückgenommen werden.'))return;
+ try{
+  const r=await api('internship-blocks/'+currentInternshipBlock.id+'/finalise',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entries})});
+  $('internshipBlockNotice').textContent=r.message+' – '+r.count+' Praktika, '+r.coins+' Münzen';
+  await refreshInternshipBlocks(currentInternshipBlock.id);await refresh();await certificateStatus();
+ }catch(e){$('internshipBlockNotice').textContent='Abrechnung fehlgeschlagen: '+e.message}
+};
+$('internshipKind').onchange=()=>{
+ const additional=$('internshipKind').value==='ZUSATZ';
+ $('internshipDays').max=additional?'5':'10';
+ if(Number($('internshipDays').value)>(additional?5:10))$('internshipDays').value=additional?'5':'10';
+};
+$('internshipForm').addEventListener('submit',async ev=>{
+ ev.preventDefault();
+ const d=Object.fromEntries(new FormData(ev.target).entries());
+ d.studentPk=Number(d.studentPk);d.recognizedDays=Number(d.recognizedDays);d.finalised=true;
+ const coins=d.recognizedDays*10;
+ if(!confirm(d.kind==='PFLICHT'?'Pflichtpraktikum mit '+coins+' Münzen endgültig anrechnen? Weitere, eigenständige Pflichtpraktika sind zulässig.':'Freiwilliges Praktikum mit '+coins+' Münzen endgültig anrechnen?'))return;
+ try{
+  const r=await api('internships',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
+  $('internshipNotice').textContent=r.message+' · '+r.coins+' Münzen';
+  await refresh();await certificateStatus();
+ }catch(e){$('internshipNotice').textContent='Praktikum konnte nicht gespeichert werden: '+e.message}
+});
+bind('eventForm','events',d=>{
+ d.coins=Number(d.coins);
+ if(d.kind==='PFLICHT'){
+  d.requiredForGrade=Number(d.requiredForGrade);
+  if(!Number.isInteger(d.requiredForGrade)||d.requiredForGrade<7||d.requiredForGrade>13){$('notice').textContent='Bitte den Zieljahrgang der Pflichtveranstaltung auswählen.';return false}
+ }else{delete d.requiredForGrade;delete d.requiredForTrack;}
+ if(!Number.isFinite(d.coins) || d.coins<0.5 || Math.round(d.coins*2)!==d.coins*2){
+  $('notice').textContent='Bitte einen positiven Münzwert in 0,5er-Schritten eingeben.';
+  return false;
+ }
+ if(d.coins>20){
+  if(!confirm('Plausibilitätswarnung: '+d.coins.toLocaleString('de-DE')+' Münzen für eine Veranstaltung sind ungewöhnlich hoch. Soll dieser Münzwert wirklich verwendet werden?'))return false;
+  d.confirmHighValue=true;
+ }
+});
 bind('grantForm','grants',d=>{d.studentPk=Number(d.studentPk);d.eventId=Number(d.eventId);d.coins=Number(d.coins)});
-sessionInit().then(refresh).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
+const certLevel={NONE:'Noch kein Zertifikat',SUCCESS:'Mit Erfolg',SPECIAL_SUCCESS:'Mit besonderem Erfolg',DISTINCTION:'Mit Auszeichnung',REVIEW_REQUIRED:'Regelprüfung erforderlich'};
+function certEligible(level){return ['SUCCESS','SPECIAL_SUCCESS','DISTINCTION'].includes(level)}
+async function certificateStatus(){
+ const id=$('certificateStudent').value;
+ $('certificatePdf').disabled=true;$('certificateDocx').disabled=true;$('certificateNewVersion').disabled=true;
+ if(!id){$('certificateStatus').textContent='Bitte zuerst eine Person wählen.';return}
+ $('certificateStatus').textContent='Prüfung läuft …';
+ try{
+  const r=await api('certificates/'+encodeURIComponent(id)+'?asOf='+encodeURIComponent($('certificateDate').value));
+  $('certificateStatus').textContent=r.name+' · '+r.coins+' Münzen · '+(certLevel[r.level]||r.level)+(r.level==='NONE'?' · Es fehlen '+r.nextDistance+' Münzen bis zur nächsten Stufe.':'');
+  const available=certEligible(r.level);
+  $('certificatePdf').disabled=!available;$('certificateDocx').disabled=!available;$('certificateNewVersion').disabled=!available;
+ }catch(e){$('certificateStatus').textContent='Statusprüfung fehlgeschlagen: '+e.message}
+}
+function certificateDownload(ext){
+ const id=$('certificateStudent').value;if(!id)return;
+ location.href='/api/certificates/'+encodeURIComponent(id)+'/'+ext+'?asOf='+encodeURIComponent($('certificateDate').value);
+}
+$('certificateCheck').onclick=certificateStatus;
+$('certificateStudent').onchange=certificateStatus;
+$('certificateDate').onchange=certificateStatus;
+$('certificatePdf').onclick=()=>certificateDownload('pdf');
+$('certificateDocx').onclick=()=>certificateDownload('docx');
+$('certificateNewVersion').onclick=()=>{
+ const id=$('certificateStudent').value;
+ if(!id || $('certificateNewVersion').disabled)return;
+ if(!confirm('Neue, archivierte Zertifikatsversion für die ausgewählte Person erstellen? Die bisherige Version bleibt erhalten.'))return;
+ location.href='/api/certificates/'+encodeURIComponent(id)+'/pdf?asOf='+encodeURIComponent($('certificateDate').value)+'&newVersion=true';
+};
+$('certificateZip').onclick=()=>{
+ const c=$('certificateClass').value;
+ if(!c){$('certificateClassStatus').textContent='Bitte eine Klasse wählen.';return}
+ $('certificateClassStatus').textContent='ZIP wird angefordert. Nur berechtigte Schülerinnen und Schüler werden aufgenommen.';
+ location.href='/api/certificates/class/'+encodeURIComponent(c)+'.zip?onlyValid=true&asOf='+encodeURIComponent($('certificateDate').value);
+};
+$('certificateDate').value=new Date().toLocaleDateString('en-CA');
+sessionInit().then(refresh).then(()=>Promise.all([certificateStatus(),refreshInternshipCompanies()])).then(refreshInternshipBlocks).catch(e=>{if(e.message==='Nicht angemeldet')location.href='/login.html';else $('notice').textContent=e.message});
 </script></body></html>

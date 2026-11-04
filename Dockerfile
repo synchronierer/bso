@@ -7,7 +7,10 @@ RUN mvn -B -q -DskipTests package
 
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN useradd --system --uid 10001 bso
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libreoffice-writer libreoffice-core fonts-liberation \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 bso
 COPY --from=build /build/target/bso-0.1.0-SNAPSHOT.jar /app/app.jar
 USER bso
 EXPOSE 8080

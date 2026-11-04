@@ -1,6 +1,7 @@
 package de.igsnanstein.bso;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.core.Authentication;
 
 @RestController
 @RequestMapping("/api")
@@ -17,7 +19,7 @@ public class DemoApi {
     DemoApi(JdbcTemplate db) { this.db = db; }
 
     public record Student(String studentId, String firstName, String lastName, String className, int grade, String track) {}
-    public record Event(String title, String endDate, BigDecimal coins) {}
+    public record Event(String title, String endDate, BigDecimal coins, Boolean confirmHighValue, String kind, Integer requiredForGrade, String requiredForTrack) {}
     public record Grant(long studentPk, long eventId, BigDecimal coins) {}
 
     @GetMapping("/health")
@@ -31,7 +33,8 @@ public class DemoApi {
             COALESCE(SUM(CASE WHEN (s.grade <= 10 AND EXTRACT(YEAR FROM e.end_date) < 9999)
                OR s.grade >= 11 THEN g.coins ELSE 0 END),0) AS coins
           FROM students s
-          LEFT JOIN coin_grants g ON g.student_pk=s.id
+          LEFT JOIN enrollment_episodes current_episode ON current_episode.student_pk=s.id AND current_episode.ends_on IS NULL
+          LEFT JOIN coin_grants g ON g.student_pk=s.id AND g.episode_id=current_episode.id
           LEFT JOIN events e ON e.id=g.event_id
           GROUP BY s.id ORDER BY s.class_name,s.last_name,s.first_name
           """);
@@ -56,28 +59,66 @@ public class DemoApi {
 
     @PostMapping("/events")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,String> addEvent(@RequestBody Event e) {
-        if(blank(e.title()) || blank(e.endDate()) || !validCoins(e.coins()) || e.coins().compareTo(BigDecimal.ZERO)<=0)
+    public Map<String,String> addEvent(@RequestBody Event e, Authentication auth) {
+        CoinRules.requireCoinValue(e.coins(), false);
+        if(blank(e.title()) || blank(e.endDate()))
             throw bad("Name, Datum und positiver Münzwert in 0,5er-Schritten erforderlich");
-        if(e.coins().compareTo(new BigDecimal("20"))>0) throw bad("Werte über 20 Münzen sind in dieser Demo gesperrt");
+        if(e.coins().compareTo(new BigDecimal("20"))>0 && !Boolean.TRUE.equals(e.confirmHighValue()))
+            throw bad("Münzwert über 20 benötigt eine ausdrückliche Bestätigung");
+        String kind=e.kind()==null||e.kind().isBlank()?"WAHLPFLICHT":e.kind().trim().toUpperCase(java.util.Locale.ROOT);
+        if(!java.util.Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(kind))
+            throw bad("Veranstaltungsart ungültig");
+        if(kind.equals("PFLICHT") && (e.requiredForGrade()==null || e.requiredForGrade()<7 || e.requiredForGrade()>13))
+            throw bad("Für eine Pflichtveranstaltung muss ein Zieljahrgang von 7 bis 13 angegeben werden");
+        if(e.requiredForTrack()!=null && e.requiredForTrack().length()>30)
+            throw bad("Bildungsgang ungültig");
+        LocalDate endDate;
+        try { endDate=LocalDate.parse(e.endDate()); }
+        catch(Exception ex){ throw bad("Ungültiges Abschlussdatum (JJJJ-MM-TT)"); }
         try {
-            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,'WAHLPFLICHT')",
-               e.title().trim(),e.endDate(),e.coins());
-        } catch (Exception ex) { throw bad("Ungültiges Datum"); }
+            db.update("INSERT INTO events(title,end_date,coins,kind,required_for_grade,required_for_track) VALUES (?,?,?,?,?,?)",
+               e.title().trim(),endDate,e.coins(),kind,
+               kind.equals("PFLICHT")?e.requiredForGrade():null,
+               kind.equals("PFLICHT") && e.requiredForTrack()!=null && !e.requiredForTrack().isBlank()?e.requiredForTrack().trim():null);
+            audit(auth,"EVENT_CREATE", "event", e.title(), null, e.title()+"/"+e.coins()+"/"+kind);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw bad("Veranstaltung konnte wegen einer Datenbankregel nicht angelegt werden");
+        }
         return Map.of("message","Veranstaltung angelegt");
     }
 
     @PostMapping("/grants")
     @Transactional
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String,String> grant(@RequestBody Grant g) {
-        if(!validCoins(g.coins()) || g.coins().compareTo(BigDecimal.ZERO)<0) throw bad("Ungültiger Münzwert");
-        List<BigDecimal> values=db.query("SELECT coins FROM events WHERE id=?", (rs,n)->rs.getBigDecimal(1),g.eventId());
-        if(values.isEmpty()) throw bad("Veranstaltung nicht gefunden");
+    public Map<String,String> grant(@RequestBody Grant g, Authentication auth) {
+        if(!CoinRules.isHalfStep(g.coins())) throw bad("Ungültiger Münzwert");
+        List<Map<String,Object>> events=db.queryForList("SELECT coins,end_date,status FROM events WHERE id=?",g.eventId());
+        if(events.isEmpty()) throw bad("Veranstaltung nicht gefunden");
+        BigDecimal standard=(BigDecimal)events.get(0).get("coins");
+        LocalDate end=((java.sql.Date)events.get(0).get("end_date")).toLocalDate();
+        if(end.isAfter(LocalDate.now())) throw bad("Buchung erst nach dem Veranstaltungsende möglich");
+        if(!"AKTIV".equals(events.get(0).get("status"))) throw bad("Veranstaltung ist beendet oder abgebrochen");
+        List<BigDecimal> values=List.of(standard);
         if(g.coins().compareTo(values.get(0))>0) throw bad("Individueller Wert darf Standard nicht übersteigen");
+        Integer equivalent = db.queryForObject("""
+            SELECT COUNT(*) FROM coin_grants old_grant
+            JOIN events old_event ON old_event.id=old_grant.event_id
+            JOIN event_equivalences old_eq ON old_eq.event_id=old_event.id
+            JOIN event_equivalences new_eq ON new_eq.group_id=old_eq.group_id
+            WHERE old_grant.student_pk=? AND new_eq.event_id=?
+              AND old_grant.episode_id=(SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1)
+              AND EXTRACT(YEAR FROM old_event.end_date)=EXTRACT(YEAR FROM CAST(? AS DATE))
+            """, Integer.class, g.studentPk(), g.eventId(), g.studentPk(), end);
+        if (equivalent != null && equivalent > 0)
+            throw bad("Eine gleichartige Wahlpflichtgruppe wurde in diesem Schuljahr bereits gewertet");
         try {
-            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins) VALUES (?,?,?)",g.studentPk(),g.eventId(),g.coins());
+            Integer studentGrade=db.queryForObject("SELECT grade FROM students WHERE id=? AND active=true",Integer.class,g.studentPk());
+            if(studentGrade==null) throw bad("Schüler nicht vorhanden oder archiviert");
+            Long episode=db.queryForObject("SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL ORDER BY id DESC LIMIT 1",Long.class,g.studentPk());
+            if(episode==null) throw bad("Schüler hat keine offene Schulbesuchsepisode");
+            int changed=db.update("INSERT INTO coin_grants(student_pk,event_id,coins,recorded_by,student_grade,episode_id) VALUES (?,?,?,?,?,?)",g.studentPk(),g.eventId(),g.coins(),auth.getName(),studentGrade,episode);
             if(changed!=1) throw bad("Buchung fehlgeschlagen");
+            audit(auth,"COIN_GRANT", "student", Long.toString(g.studentPk()), null, g.coins().toPlainString());
         } catch(DataIntegrityViolationException ex) { throw bad("Schüler nicht vorhanden oder Veranstaltung schon verbucht"); }
         return Map.of("message","Münzen verbucht");
     }
@@ -87,4 +128,10 @@ public class DemoApi {
     }
     private boolean blank(String s) { return s==null || s.isBlank(); }
     private ResponseStatusException bad(String s) { return new ResponseStatusException(HttpStatus.BAD_REQUEST,s); }
+
+    private void audit(Authentication auth, String action, String type, String id, String before, String after) {
+        db.update("INSERT INTO audit_events(actor,action,object_type,object_id,before_json,after_json) VALUES (?,?,?,?,CAST(? AS JSONB),CAST(? AS JSONB))",
+            auth.getName(), action, type, id, before == null ? "null" : quote(before), quote(after));
+    }
+    private String quote(String value) { return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""; }
 }
