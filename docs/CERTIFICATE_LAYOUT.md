@@ -1,8 +1,10 @@
 # Zertifikatslayout RC1
 
-Die verbindliche Layoutbeschreibung `docs/CERTIFICATE_LAYOUT_ORIGINAL.md` ist Bestandteil des Branches. Die private Datei `BSO_Originalbriefkopf_bereinigt.docx` (ebenso `BK_Kania.docx` und `ZertifikatVorlage.docx`) war in der isolierten Arbeitskopie jedoch nicht vorhanden. Deshalb wurden keine unbekannten Logos, Briefkopfdateien oder Signaturgrafiken erfunden.
+Die verbindliche Layoutbeschreibung `docs/CERTIFICATE_LAYOUT_ORIGINAL.md` ist Bestandteil des Branches. Die private, signaturbereinigte Datei `BSO_Originalbriefkopf_bereinigt.docx` wird außerhalb Git unter `/opt/bso-private` verwahrt und im Compose-Dienst nur read-only nach `/run/bso-private/` eingebunden. Die Vorlage und die daraus erzeugten Dokumente werden nicht in Git aufgenommen.
 
-Die Ausgabe verwendet eine zentrale DOCX-Layoutquelle. Sie wird über `BSO_CERTIFICATE_TEMPLATE` beziehungsweise `bso.certificate.template-path` aus einem privaten, signaturbereinigten Template geladen. Die PDF wird im Container ausschließlich aus dem erzeugten DOCX mit LibreOffice headless erzeugt; damit gibt es keine zweite PDF-Layoutdefinition. Ohne private Vorlage bleibt der sichere, textbasierte Fallback aktiv:
+Die Ausgabe verwendet eine zentrale DOCX-Layoutquelle. Sie wird über `BSO_CERTIFICATE_TEMPLATE` beziehungsweise `bso.certificate.template-path` aus dem privaten, signaturbereinigten Template geladen. Sobald die Vorlage aktiv ist, wird kein zusätzlicher Ersatzbriefkopf erzeugt; Header, Logo, Margins und Seitenlayout stammen aus der Original-DOCX. Die PDF wird im Container ausschließlich aus dem erzeugten DOCX mit LibreOffice headless erzeugt; damit gibt es keine zweite PDF-Layoutdefinition. Ohne private Vorlage bleibt der sichere, textbasierte Fallback aktiv:
+
+`compose.yaml` bindet standardmäßig `/opt/bso-private/BSO_Originalbriefkopf_bereinigt.docx` als read-only Volume ein und setzt im Container `BSO_CERTIFICATE_TEMPLATE=/run/bso-private/BSO_Originalbriefkopf_bereinigt.docx`. Für einen anderen privaten Ablageort wird ausschließlich `BSO_CERTIFICATE_TEMPLATE_HOST` außerhalb von Git gesetzt.
 
 - dunkelblauer offizieller Schulkopf mit vollständiger Anschrift und Kontaktdaten;
 - goldene Akzentfarbe, Arial/Helvetica-Schriftfamilie und klare Abschnittsüberschriften;
@@ -17,6 +19,6 @@ Die Ausgabe verwendet eine zentrale DOCX-Layoutquelle. Sie wird über `BSO_CERTI
 
 ## Qualitätssicherung
 
-Mit fiktiven Daten wurden zwei Varianten erzeugt: Anna Beispiel mit Workshop und Pflichtpraktikum sowie Ben Beispiel mit Bewerbungstraining. Beide PDF-/DOCX-Paare wurden erzeugt. PDFBox bestätigte jeweils eine Seite, das dynamische deutsche Datum und das Fehlen von `Ort/Datum`; Apache POI bestätigte die DOCX-Inhalte. Die gerenderten PDF-Seiten wurden visuell verglichen: identische Tabellenstruktur, Seitenumbruch und Satzspiegel, keine abgeschnittenen Texte und sichtbare Unterschriftszeile.
+Mit fiktiven Daten wurde bei aktivierter Originalvorlage Clara Vorlage, Jahrgang 9 BR, mit einem Zukunftstag erzeugt. Das PDF hat eine A4-Seite; die DOCX enthält denselben Original-Header, das IGS-Logo, die Tabellen und die Schlusszeile. Die gerenderte PDF-Seite wurde visuell geprüft; der PDF-Render stammt direkt aus derselben DOCX und hat daher identische Tabellen, Seitenumbrüche und Margins. Zusätzlich wurden die DOCX-Struktur, Headertext, eingebettetes Logo, deutsches Datum und das Fehlen von `Ort/Datum` geprüft.
 
 Die echte Briefkopfvorlage und eine freigegebene Unterschriftsgrafik müssen vor der Produktivfreigabe durch BSO-Koordination/Schul-IT bereitgestellt und separat abgenommen werden. Sie gehören nicht in Git.
