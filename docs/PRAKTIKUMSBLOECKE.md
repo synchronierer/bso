@@ -19,7 +19,7 @@ API:
 - `POST /api/internship-blocks/{id}/placements`: Betriebe für ausgewählte Personen speichern, ohne Münzen
 - `POST /api/internship-blocks/{id}/finalise`: ausgewählte Platzierungen endgültig mit Tagen abrechnen
 
-Eine Abrechnung wird transaktional durchgeführt. Bestehende Regeln (ehemaliger Einzelbuchungsendpunkt) für Pflichtpraktika pro Münzblock und Zusatzpraktika pro Schuljahr bleiben wirksam. Die Abrechnung nach Enddatum, Aktivstatus, Klassen- und Episodenprüfung verhindert voreilige und versehentliche Buchungen. **Versehentlich endgültige Buchungen erfordern einen gesonderten Korrekturprozess**; keine automatische Löschung.
+Eine Abrechnung wird transaktional durchgeführt. **Mehrere unterschiedliche Pflichtpraktika** dürfen pro Schülerin oder Schüler auch im selben Schuljahr und Münzblock endgültig abgerechnet werden (Flyway V10 entfernt die bisherigen Häufigkeitssperren). Das einzelne Pflichtpraktikum bleibt auf 10 Tage bzw. 100 Münzen begrenzt. Die Sperre auf maximal ein freiwilliges Zusatzpraktikum pro Schuljahr bleibt bestehen. Die Abrechnung nach Enddatum, Aktivstatus, Klassen- und Episodenprüfung verhindert voreilige und versehentliche Buchungen. **Versehentlich endgültige Buchungen erfordern einen gesonderten Korrekturprozess**; keine automatische Löschung.
 
 ## Testfälle vor produktivem Einsatz
 
@@ -33,3 +33,6 @@ Eine Abrechnung wird transaktional durchgeführt. Bestehende Regeln (ehemaliger 
 - Bestehende historische Praktika bleiben nach Flyway V8 erhalten.
 
 **Freigabe:** Nur fiktive Daten im RC1-Testbetrieb. Vor Echtdaten Datenschutz-, Backup- und fachliche Abnahme durchführen.
+
+- Zwei **verschiedene Pflichtpraktikumsblöcke im selben Schuljahr** mit demselben Schüler jeweils separat abrechnen: beide Buchungen zulässig und werden zum Münzstand addiert.
+- Dasselbe konkrete Pflichtpraktikum in der Einzelbuchung ein zweites Mal eintragen: ablehnen, ohne doppelte Münzen.
