@@ -14,7 +14,7 @@ class InternshipCompanyControllerTest {
 
     @Test void previewDoesNotWriteAndIdentifiesExistingCompanies(){
         when(db.queryForObject(anyString(),eq(Integer.class),any(Object.class)))
-            .thenAnswer(call->"Vorhandener Betrieb".equals(call.getArgument(2))?1:0);
+            .thenAnswer(call->"vorhandener betrieb".equals(call.getArgument(2))?1:0);
         var file=new MockMultipartFile("file","betriebe.csv","text/csv",
             "Betrieb\nVorhandener Betrieb\nNeuer Betrieb\n".getBytes(java.nio.charset.StandardCharsets.UTF_8));
         var preview=controller.preview(file);
