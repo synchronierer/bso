@@ -19,7 +19,7 @@ public class InternshipBlockController {
         this.db=db; this.internships=internships;
     }
 
-    record NewBlock(String title,String className,String kind,String startsOn,String endsOn){}
+    record NewBlock(String title,String kind,String startsOn,String endsOn){}
     record Placement(long studentPk,String company){}
     record SavePlacements(List<Placement> entries){}
     record FinaliseRow(long placementId,int recognizedDays){}
@@ -28,7 +28,7 @@ public class InternshipBlockController {
     @GetMapping
     public List<Map<String,Object>> blocks() {
         return db.queryForList("""
-            SELECT b.id,b.title,b.class_name AS "className",b.kind,
+            SELECT b.id,b.title,b.kind,
               b.starts_on AS "startsOn",b.ends_on AS "endsOn",
               COUNT(p.id) AS "placements",
               COUNT(p.internship_id) AS "finalised"
@@ -41,25 +41,24 @@ public class InternshipBlockController {
     @Transactional
     @ResponseStatus(HttpStatus.CREATED)
     public Map<String,Object> create(@RequestBody NewBlock r,Authentication auth) {
-        if(r==null||blank(r.title())||r.title().length()>200||blank(r.className())||r.className().length()>50)
-            throw bad("Bezeichnung und Klasse sind erforderlich");
+        if(r==null||blank(r.title())||r.title().length()>200)
+            throw bad("Bezeichnung ist erforderlich");
         String kind=r.kind()==null?"":r.kind().trim().toUpperCase(Locale.ROOT);
         if(!Set.of("PFLICHT","ZUSATZ").contains(kind))throw bad("Praktikumsart ungültig");
         LocalDate start=parse(r.startsOn()),end=parse(r.endsOn());
         if(end.isBefore(start))throw bad("Das Enddatum darf nicht vor dem Anfang liegen");
-        Integer pupils=db.queryForObject("SELECT COUNT(*) FROM students WHERE active=true AND class_name=?",Integer.class,r.className().trim());
-        if(pupils==null||pupils==0)throw bad("Für diese Klasse sind keine aktiven Schüler vorhanden");
         Long id=db.queryForObject("""
-            INSERT INTO internship_blocks(title,class_name,kind,starts_on,ends_on,created_by)
-            VALUES(?,?,?,?,?,?) RETURNING id
-            """,Long.class,r.title().trim(),r.className().trim(),kind,start,end,auth.getName());
+            INSERT INTO internship_blocks(title,kind,starts_on,ends_on,created_by)
+            VALUES(?,?,?,?,?) RETURNING id
+            """,Long.class,r.title().trim(),kind,start,end,auth.getName());
         audit(auth,"INTERNSHIP_BLOCK_CREATE",String.valueOf(id));
         return Map.of("id",id,"message","Praktikumsblock gespeichert – noch keine Münzen vergeben");
     }
 
     @GetMapping("/{id}/placements")
-    public List<Map<String,Object>> placements(@PathVariable long id) {
-        Map<String,Object> block=block(id);
+    public List<Map<String,Object>> placements(@PathVariable long id,@RequestParam String className) {
+        block(id);
+        if(blank(className)||className.length()>50)throw bad("Bitte eine Klasse als Filter wählen");
         return db.queryForList("""
             SELECT s.id AS "studentPk",s.first_name AS "firstName",s.last_name AS "lastName",
               s.student_id AS "studentId",p.id AS "placementId",p.company,
@@ -68,13 +67,13 @@ public class InternshipBlockController {
             LEFT JOIN internship_placements p ON p.student_pk=s.id AND p.block_id=?
             WHERE s.class_name=? AND s.active=true
             ORDER BY s.last_name,s.first_name,s.id
-            """,id,block.get("class_name"));
+            """,id,className.trim());
     }
 
     @PostMapping("/{id}/placements")
     @Transactional
     public Map<String,Object> save(@PathVariable long id,@RequestBody SavePlacements request,Authentication auth) {
-        Map<String,Object> block=block(id);
+        block(id);
         db.queryForObject("SELECT id FROM internship_blocks WHERE id=? FOR UPDATE",Long.class,id);
         if(request==null||request.entries()==null||request.entries().isEmpty()||request.entries().size()>300)
             throw bad("Bitte mindestens einen Schüler mit Betrieb eintragen");
@@ -85,8 +84,8 @@ public class InternshipBlockController {
                 throw bad("Schüler oder Betrieb ungültig oder doppelt");
             Map<String,Object> s=db.query("SELECT s.class_name,ep.id AS episode_id FROM students s JOIN enrollment_episodes ep ON ep.student_pk=s.id AND ep.ends_on IS NULL WHERE s.id=? AND s.active=true",
                 rs->rs.next()?Map.of("class_name",rs.getString(1),"episode_id",rs.getLong(2)):null,item.studentPk());
-            if(s==null||!block.get("class_name").equals(s.get("class_name")))
-                throw bad("Schüler gehört nicht zur aktuellen Klasse oder hat keine offene Schulbesuchsepisode");
+            if(s==null)
+                throw bad("Schüler ist nicht aktiv oder hat keine offene Schulbesuchsepisode");
             Integer existing=db.query("SELECT COUNT(*) FROM internship_placements WHERE block_id=? AND student_pk=? AND internship_id IS NOT NULL",
                 rs->rs.next()?rs.getInt(1):0,id,item.studentPk());
             if(existing!=null&&existing>0)throw bad("Bereits endgültig angerechnete Einträge können nicht verändert werden");
@@ -127,8 +126,8 @@ public class InternshipBlockController {
                     "active",rs.getBoolean(5),"className",rs.getString(6)):null,item.placementId(),id);
             if(placement==null||((Long)placement.get("internshipId"))!=0L)
                 throw bad("Praktikum fehlt oder wurde bereits endgültig abgerechnet");
-            if(!(Boolean)placement.get("active")||!block.get("class_name").equals(placement.get("className")))
-                throw bad("Schüler ist nicht mehr aktiv in der vorgesehenen Klasse");
+            if(!(Boolean)placement.get("active"))
+                throw bad("Schüler ist nicht mehr aktiv");
             Long currentEpisode=db.query("SELECT id FROM enrollment_episodes WHERE student_pk=? AND ends_on IS NULL",
                 rs->rs.next()?rs.getLong(1):null,placement.get("studentPk"));
             if(!Objects.equals(currentEpisode,placement.get("episodeId")))
@@ -153,11 +152,11 @@ public class InternshipBlockController {
     }
 
     private Map<String,Object> block(long id){
-        return db.query("SELECT id,title,class_name,kind,starts_on,ends_on FROM internship_blocks WHERE id=?",
+        return db.query("SELECT id,title,kind,starts_on,ends_on FROM internship_blocks WHERE id=?",
             rs->{if(!rs.next())throw bad("Praktikumsblock nicht gefunden");
                 Map<String,Object> m=new HashMap<>();
-                m.put("id",rs.getLong(1));m.put("title",rs.getString(2));m.put("class_name",rs.getString(3));
-                m.put("kind",rs.getString(4));m.put("starts_on",rs.getDate(5));m.put("ends_on",rs.getDate(6));
+                m.put("id",rs.getLong(1));m.put("title",rs.getString(2));
+                m.put("kind",rs.getString(3));m.put("starts_on",rs.getDate(4));m.put("ends_on",rs.getDate(5));
                 return m;},id);
     }
     private boolean blank(String s){return s==null||s.isBlank();}
