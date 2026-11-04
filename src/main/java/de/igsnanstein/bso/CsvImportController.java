@@ -68,8 +68,9 @@ public class CsvImportController {
         int changed=0;
         for(Map<String,Object> r:p.rows()){
             if(!"ADD".equals(r.get("action")))continue;
-            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,?)",
-                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")),r.get("kind"));
+            db.update("INSERT INTO events(title,end_date,coins,kind,required_for_grade,required_for_track) VALUES (?,CAST(? AS DATE),?,?,?,?)",
+                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")),r.get("kind"),
+                r.get("requiredForGrade"),r.get("requiredForTrack"));
             changed++;
         }
         return Map.of("message","Veranstaltungsimport abgeschlossen","changed",changed);
@@ -131,11 +132,25 @@ public class CsvImportController {
                             row.put("warning","Über 20 Münzen – bestätigungspflichtig");
                         String key=title+"|"+end;
                         if(!keys.add(key))throw new IllegalArgumentException("Doppelte Veranstaltung in CSV");
-                        String kind=optionalField(record,"kind","Art","Veranstaltungsart").toUpperCase(Locale.ROOT);
-                        if(kind.isBlank()) kind="WAHLPFLICHT";
-                        if(!Set.of("PFLICHT","WAHLPFLICHT","WAHL","WORKSHOP").contains(kind))
-                            throw new IllegalArgumentException("Veranstaltungsart ungültig");
+                        String kind=EventKind.parse(field(record,"kind","Art","Veranstaltungsart"));
+                        String gradeText=optionalField(record,"requiredForGrade","PflichtJahrgang","Zieljahrgang","Jahrgang");
+                        String trackText=optionalField(record,"requiredForTrack","PflichtBildungsgang","Zielbildungsgang","Bildungsgang");
+                        Integer requiredForGrade=null;
+                        String requiredForTrack=null;
+                        if("PFLICHT".equals(kind)){
+                            if(gradeText.isBlank())throw new IllegalArgumentException("Bei P muss ein Zieljahrgang (7 bis 13) angegeben werden");
+                            requiredForGrade=Integer.valueOf(gradeText);
+                            if(requiredForGrade<7||requiredForGrade>13)throw new IllegalArgumentException("Zieljahrgang muss zwischen 7 und 13 liegen");
+                            if(!trackText.isBlank()){
+                                if(!Set.of("BR","V10","S1","Ü11","MSS").contains(trackText.toUpperCase(Locale.ROOT)))
+                                    throw new IllegalArgumentException("Zielbildungsgang ungültig");
+                                requiredForTrack=trackText.toUpperCase(Locale.ROOT);
+                            }
+                        }else if(!gradeText.isBlank()||!trackText.isBlank()){
+                            throw new IllegalArgumentException("Zieljahrgang und Zielbildungsgang nur für P verwenden");
+                        }
                         row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());row.put("kind",kind);
+                        row.put("requiredForGrade",requiredForGrade);row.put("requiredForTrack",requiredForTrack);
                         Integer n=db.queryForObject("SELECT COUNT(*) FROM events WHERE title=? AND end_date=CAST(? AS DATE)",
                              Integer.class,title,end);
                         action=(n!=null && n>0)?"UNCHANGED":"ADD";
