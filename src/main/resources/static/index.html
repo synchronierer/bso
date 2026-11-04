@@ -71,10 +71,10 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <button type="button" id="internshipBlockSave">Betriebe vorab speichern</button>
 <button type="button" id="internshipBlockFinalise">Ausgewählte Praktika endgültig abrechnen</button>
 </div>
-<p><small>Ein gespeicherter Vorabeintrag zählt <strong>0 Münzen</strong>, bis die Münzvergabe nach Ende des Blocks ausdrücklich bestätigt wird. Pflichtpraktikum: 10 Münzen je anerkanntem Tag, maximal 100 Münzen pro Münzblock; Zusatzpraktikum maximal 50 Münzen pro Schuljahr.</small></p>
+<p><small>Ein gespeicherter Vorabeintrag zählt <strong>0 Münzen</strong>, bis die Münzvergabe nach Ende des Blocks ausdrücklich bestätigt wird. Pflichtpraktika: mehrere pro Schuljahr und Münzblock möglich, jeweils maximal 100 Münzen (10 Münzen pro anerkanntem Tag). Zusatzpraktikum maximal 50 Münzen und weiterhin nur einmal pro Schuljahr.</small></p>
 <details><summary>Einzelnes bereits abgeschlossenes Praktikum nachtragen</summary>
 <h3>Einzelnachtrag</h3>
-<p>Praktika werden separat abgerechnet. Pflichtpraktikum: einmal je Münzblock, höchstens 10 Tage bzw. 100 Münzen. Freiwilliges Zusatzpraktikum: einmal je Schuljahr, höchstens 5 Tage bzw. 50 Münzen.</p>
+<p>Praktika werden separat abgerechnet. Pflichtpraktika: mehrfach möglich, jeweils höchstens 10 anerkannte Tage bzw. 100 Münzen. Freiwilliges Zusatzpraktikum: einmal je Schuljahr, höchstens 5 Tage bzw. 50 Münzen.</p>
 <form id="internshipForm">
 <label>Schülerin / Schüler<select name="studentPk" id="internshipStudent" required></select></label>
 <label>Art<select name="kind" id="internshipKind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
@@ -250,7 +250,7 @@ $('internshipForm').addEventListener('submit',async ev=>{
  const d=Object.fromEntries(new FormData(ev.target).entries());
  d.studentPk=Number(d.studentPk);d.recognizedDays=Number(d.recognizedDays);d.finalised=true;
  const coins=d.recognizedDays*10;
- if(!confirm(d.kind==='PFLICHT'?'Pflichtpraktikum mit '+coins+' Münzen endgültig anrechnen? Die erste endgültige Buchung schließt die Abrechnung in diesem Münzblock ab.':'Freiwilliges Praktikum mit '+coins+' Münzen endgültig anrechnen?'))return;
+ if(!confirm(d.kind==='PFLICHT'?'Pflichtpraktikum mit '+coins+' Münzen endgültig anrechnen? Weitere, eigenständige Pflichtpraktika sind zulässig.':'Freiwilliges Praktikum mit '+coins+' Münzen endgültig anrechnen?'))return;
  try{
   const r=await api('internships',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   $('internshipNotice').textContent=r.message+' · '+r.coins+' Münzen';
