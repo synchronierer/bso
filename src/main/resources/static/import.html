@@ -11,6 +11,11 @@ td,th{padding:8px;border-bottom:1px solid #e0e6ee;text-align:left;white-space:no
 <section><h2>1. Datei auswählen</h2>
 <p><label>Datentyp: <select id="kind"><option value="students">Schülerinnen und Schüler</option><option value="events">Veranstaltungen</option></select></label></p>
 <p id="columns">Spalten: <code>studentId;firstName;lastName;className;grade;track</code></p>
+<div id="eventImportHelp" hidden>
+<p><strong>Veranstaltungsarten:</strong> <code>P</code> = Pflicht, <code>WP</code> = Wahlpflicht, <code>W</code> = Wahlveranstaltung, <code>WS</code> = Netzwerkpartner-Workshop.</p>
+<p>Bei <code>P</code> zusätzlich den <strong>Zieljahrgang</strong> (7–13) angeben. Der Zielbildungsgang ist optional (BR, V10, S1, Ü11 oder MSS). Bei anderen Veranstaltungsarten beide Felder leer lassen.</p>
+<p><a href="/veranstaltungen-vorlage.csv" download>CSV-Mustervorlage für Veranstaltungen herunterladen</a> – auch als XLSX mit denselben Spalten verwendbar.</p>
+</div>
 <input type="file" id="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <button id="preview">Vorschau anzeigen</button>
 <p id="message" role="status"></p></section>
@@ -24,8 +29,8 @@ const el=id=>document.getElementById(id);
 fetch('/api/csrf').then(r=>r.json()).then(x=>csrf=x.token);
 el('kind').onchange=()=>{el('columns').innerHTML=el('kind').value==='students'
 ?'Spalten: <code>studentId;firstName;lastName;className;grade;track</code>'
-:'Spalten: <code>title;endDate;coins</code> (Datum: JJJJ-MM-TT)';
-el('result').hidden=true};
+:'Spalten: <code>title;endDate;coins;kind;requiredForGrade;requiredForTrack</code> (Datum: JJJJ-MM-TT)';
+el('eventImportHelp').hidden=el('kind').value!=='events';el('result').hidden=true};
 async function post(url,payload){
 const r=await fetch('/api/import/'+url,{method:'POST',headers:{'Content-Type':'application/json','X-XSRF-TOKEN':csrf},
 body:JSON.stringify(payload)});
@@ -40,16 +45,17 @@ const file=el('file').files[0];if(!file){el('message').textContent='Bitte CSV-Da
 try{kind=el('kind').value;const xlsx=file.name.toLowerCase().endsWith('.xlsx');csv=xlsx?file:await file.text();summary=xlsx?await postXlsx(kind,file):await post(kind+'/preview',{csv});
 el('result').hidden=false;
 el('counts').textContent='Neu: '+summary.added+' · Aktualisiert: '+summary.updated+' · Unverändert: '+summary.unchanged+' · Fehler: '+summary.errors;
-const cols=kind==='students'?['action','studentId','lastName','firstName','className','grade','track','error']:['action','title','endDate','coins','error'];
+const cols=kind==='students'?['action','studentId','lastName','firstName','className','grade','track','error']:['action','title','endDate','coins','kind','requiredForGrade','requiredForTrack','warning','error'];
 const header=document.createElement('tr');for(let c of cols){let th=document.createElement('th');th.textContent=c;header.append(th)}el('head').replaceChildren(header);
 el('rows').replaceChildren();for(let row of summary.rows){let tr=document.createElement('tr');for(let c of cols){let td=document.createElement('td');td.textContent=row[c]??'';tr.append(td)}el('rows').append(tr)}
 el('confirm').disabled=summary.errors>0 || (summary.added+summary.updated===0);
-el('message').textContent='Vorschau erstellt – es wurde noch nichts gespeichert.';
+el('message').textContent='Vorschau erstellt – es wurde noch nichts gespeichert.'+(summary.rows.some(row=>row.warning)?' Achtung: Veranstaltungen über 20 Münzen werden vor der Übernahme ausdrücklich bestätigt.':'');
 }catch(e){el('message').textContent=e.message;el('result').hidden=true}};
 el('confirm').onclick=async()=>{
-if(!confirm('Alle geprüften Änderungen jetzt endgültig übernehmen?'))return;
+const high=kind==='events'&&summary.rows.some(row=>row.warning);
+if(!confirm(high?'Veranstaltungen mit mehr als 20 Münzen enthalten. Alle geprüften Änderungen einschließlich dieser hohen Münzwerte ausdrücklich übernehmen?':'Alle geprüften Änderungen jetzt endgültig übernehmen?'))return;
 el('confirm').disabled=true;
-try{const xlsx=typeof csv!=='string';const r=xlsx?await postXlsx(kind,csv,true):await post(kind+'/confirm',{csv,confirmHighValue:true});el('message').textContent=r.message+': '+r.changed+' Einträge geändert';el('result').hidden=true}
+try{const xlsx=typeof csv!=='string';const r=xlsx?await postXlsx(kind,csv,high):await post(kind+'/confirm',{csv,confirmHighValue:high});el('message').textContent=r.message+': '+r.changed+' Einträge geändert';el('result').hidden=true}
 catch(e){el('message').textContent=e.message;el('confirm').disabled=false}};
 el('cancel').onclick=()=>{el('result').hidden=true;csv=''};
 </script></body></html>
