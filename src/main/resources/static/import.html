@@ -19,6 +19,21 @@ td,th{padding:8px;border-bottom:1px solid #e0e6ee;text-align:left;white-space:no
 <input type="file" id="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
 <button id="preview">Vorschau anzeigen</button>
 <p id="message" role="status"></p></section>
+<section id="companyImport">
+<h2>Praktikumsbetriebe importieren</h2>
+<p>Eine Liste von Betrieben einmalig importieren und anschließend im Praktikumsblock aus einer Auswahlliste auswählen. <strong>Keine Schüler- oder Münzbuchungen</strong> entstehen durch den Import.</p>
+<p>Spalte: <code>Betrieb</code> (alternativ <code>name</code>, <code>company</code> oder <code>Betriebsname</code>). CSV und XLSX möglich.</p>
+<p><a href="/praktikumsbetriebe-vorlage.csv" download>CSV-Mustervorlage für Praktikumsbetriebe herunterladen</a></p>
+<input type="file" id="companyFile" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">
+<button type="button" id="companyPreview">Betriebsliste prüfen</button>
+<p id="companyMessage" role="status"></p>
+<div id="companyResult" hidden>
+<p id="companyCounts"></p>
+<div class="scroll"><table><thead><tr><th>Zeile</th><th>Status</th><th>Betrieb</th><th>Fehler</th></tr></thead><tbody id="companyRows"></tbody></table></div>
+<button type="button" id="companyConfirm" disabled>Betriebe übernehmen</button>
+<button type="button" id="companyCancel">Abbrechen</button>
+</div>
+</section>
 <section id="result" hidden><h2>2. Prüfen und übernehmen</h2><p id="counts"></p>
 <div class="scroll"><table><thead id="head"></thead><tbody id="rows"></tbody></table></div>
 <p><button id="confirm" disabled>Import bestätigen</button><button id="cancel">Abbrechen</button></p>
@@ -58,4 +73,48 @@ el('confirm').disabled=true;
 try{const xlsx=typeof csv!=='string';const r=xlsx?await postXlsx(kind,csv,high):await post(kind+'/confirm',{csv,confirmHighValue:high});el('message').textContent=r.message+': '+r.changed+' Einträge geändert';el('result').hidden=true}
 catch(e){el('message').textContent=e.message;el('confirm').disabled=false}};
 el('cancel').onclick=()=>{el('result').hidden=true;csv=''};
+let companyImportFile=null;
+async function companyPost(action,file){
+ const form=new FormData();form.append('file',file);
+ const response=await fetch('/api/internship-companies/'+action,{
+  method:'POST',headers:{'X-XSRF-TOKEN':csrf},body:form
+ });
+ if(!response.ok){
+  let msg='Fehler (HTTP '+response.status+')';
+  try{const data=await response.json();msg=data.detail||data.message||msg}catch{}
+  throw Error(msg);
+ }
+ return response.json();
+}
+el('companyPreview').onclick=async()=>{
+ companyImportFile=el('companyFile').files[0];
+ if(!companyImportFile){el('companyMessage').textContent='Bitte eine CSV- oder XLSX-Datei wählen.';return}
+ try{
+  const preview=await companyPost('preview',companyImportFile);
+  el('companyCounts').textContent='Neu: '+preview.added+' · Bereits vorhanden: '+preview.unchanged+' · Fehler: '+preview.errors;
+  el('companyRows').replaceChildren();
+  for(const row of preview.rows){
+   const tr=document.createElement('tr');
+   for(const field of ['line','action','name','error']){
+    const td=document.createElement('td');td.textContent=row[field]??'';tr.append(td);
+   }
+   el('companyRows').append(tr);
+  }
+  el('companyResult').hidden=false;
+  el('companyConfirm').disabled=preview.errors>0||preview.added===0;
+  el('companyMessage').textContent='Vorschau erstellt. Es wurde noch kein Betrieb gespeichert.';
+ }catch(err){el('companyResult').hidden=true;el('companyMessage').textContent=err.message}
+};
+el('companyConfirm').onclick=async()=>{
+ if(!companyImportFile)return;
+ if(!confirm('Die geprüften Praktikumsbetriebe in den Betriebskatalog übernehmen?'))return;
+ el('companyConfirm').disabled=true;
+ try{
+  const result=await companyPost('confirm',companyImportFile);
+  el('companyMessage').textContent=result.message+': '+result.changed+' neue Betriebe.';
+  el('companyResult').hidden=true;
+ }catch(err){el('companyMessage').textContent=err.message;el('companyConfirm').disabled=false}
+};
+el('companyCancel').onclick=()=>{el('companyResult').hidden=true;companyImportFile=null};
+
 </script></body></html>
