@@ -44,19 +44,24 @@ public class InternshipController {
             db.queryForObject("SELECT id FROM enrollment_episodes WHERE id=? FOR UPDATE",Long.class,episode);
             Integer grade=db.queryForObject("SELECT grade FROM students WHERE id=?",Integer.class,request.studentPk());
             String block=grade<=10?"SEK_I":"OBERSTUFE";
-            if(kind.equals("PFLICHT")) {
-                Integer prior=db.queryForObject("SELECT COUNT(*) FROM internships WHERE episode_id=? AND kind='PFLICHT' AND finalised AND coin_block=?",Integer.class,episode,block);
-                if(prior!=null && prior>0) throw bad("Pflichtpraktikum wurde für diesen Münzblock bereits abgerechnet");
-            } else {
+            if(kind.equals("ZUSATZ")) {
                 Integer prior=db.queryForObject("SELECT COUNT(*) FROM internships WHERE episode_id=? AND school_year_id=? AND kind='ZUSATZ' AND finalised",Integer.class,episode,schoolYear);
                 if(prior!=null && prior>0) throw bad("Freiwilliges Praktikum wurde in diesem Schuljahr bereits abgerechnet");
             }
+            // Multiple mandatory internships are permitted. Prevent accidentally
+            // recording the exact same internship for the same pupil twice.
+            Integer duplicate=db.queryForObject("""
+                SELECT COUNT(*) FROM internships
+                WHERE episode_id=? AND kind=? AND company=? AND starts_on=? AND ends_on=? AND finalised
+                """,Integer.class,episode,kind,request.company().trim(),starts,ends);
+            if(duplicate!=null && duplicate>0)
+                throw bad("Dieses Praktikum ist für den Schüler bereits endgültig gespeichert");
             int changed=db.update("INSERT INTO internships(student_pk,episode_id,school_year_id,kind,coin_block,company,starts_on,ends_on,recognized_days,coins,finalised,recorded_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                 request.studentPk(),episode,schoolYear,kind,block,request.company().trim(),starts,ends,request.recognizedDays(),coins,request.finalised(),auth.getName());
             db.update("INSERT INTO audit_events(actor,action,object_type,object_id,before_json,after_json) VALUES (?,?,?, ?,CAST('null' AS JSONB),CAST(? AS JSONB))",
                 auth.getName(),"INTERNSHIP_CREATE","student",Long.toString(request.studentPk()),"{\"kind\":\""+kind+"\",\"coins\":"+coins+"}");
             return Map.of("message","Praktikum gespeichert","coins",coins,"changed",changed);
-        } catch(org.springframework.dao.DataIntegrityViolationException ex){throw bad("Dieses Praktikum wurde für den maßgeblichen Zeitraum bereits endgültig angerechnet");}
+        } catch(org.springframework.dao.DataIntegrityViolationException ex){throw bad("Praktikum konnte wegen einer bereits vorhandenen Buchung oder einer Datenbankregel nicht gespeichert werden");}
     }
     private LocalDate parse(String value){try{return LocalDate.parse(value);}catch(Exception ex){throw bad("Datum muss JJJJ-MM-TT sein");}}
     private ResponseStatusException bad(String message){return new ResponseStatusException(HttpStatus.BAD_REQUEST,message);}
