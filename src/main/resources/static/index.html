@@ -52,18 +52,17 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <button>Endgültig verbuchen</button></form><small>Entwürfe im <a href="/roster.html">Klassenraster</a> speichern.</small></section>
 <section id="internships">
 <h2>Praktikumsblöcke – vorher planen, danach Münzen vergeben</h2>
-<p><strong>Schritt 1:</strong> Block mit Klasse und gemeinsamem Zeitraum anlegen. <strong>Schritt 2:</strong> Für Schülerinnen und Schüler die Betriebe eintragen und speichern. <strong>Schritt 3:</strong> Erst nach dem Praktikumsende anerkannte Tage prüfen und Münzen endgültig vergeben.</p>
+<p><strong>Schritt 1:</strong> Klassenübergreifenden Block mit gemeinsamem Zeitraum anlegen. <strong>Schritt 2:</strong> Für Schülerinnen und Schüler die Betriebe eintragen und speichern. <strong>Schritt 3:</strong> Erst nach dem Praktikumsende anerkannte Tage prüfen und Münzen endgültig vergeben.</p>
 <form id="internshipBlockForm">
-<label>Bezeichnung<input name="title" placeholder="Betriebspraktikum 9a" maxlength="200" required></label>
-<label>Klasse (verbindlich für diesen Block)<select name="className" id="internshipBlockClass" required></select></label>
+<label>Bezeichnung<input name="title" placeholder="Betriebspraktikum November 2026" maxlength="200" required></label>
 <label>Art<select name="kind"><option value="PFLICHT">Pflichtpraktikum</option><option value="ZUSATZ">Freiwilliges Zusatzpraktikum</option></select></label>
 <label>Beginn<input name="startsOn" type="date" required></label>
 <label>Ende<input name="endsOn" type="date" required></label>
 <button type="submit">Praktikumsblock anlegen</button>
 </form>
 <form id="internshipBlockSelection" onsubmit="return false">
-<label>Nach Klasse filtern<select id="internshipBlockClassFilter"><option value="">Alle Klassen anzeigen</option></select></label>
 <label>Vorhandenen Block öffnen<select id="internshipBlockSelect"></select></label>
+<label>Schüler nach Klasse filtern<select id="internshipBlockClassFilter" required></select></label>
 <button type="button" id="internshipBlockReload">Block öffnen</button>
 </form>
 <p id="internshipBlockNotice" role="status"></p>
@@ -146,10 +145,10 @@ function opt(sel,id,txt){const o=document.createElement('option');o.value=id;o.t
 function cell(tr,val){const x=document.createElement('td');x.textContent=val??'';tr.append(x)}
 async function refresh(){
  const [students,events]=await Promise.all([api('students'),api('events')]);
- $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();$('internshipStudent').replaceChildren();$('internshipBlockClass').replaceChildren();$('internshipBlockClassFilter').replaceChildren();opt($('internshipBlockClassFilter'),'','Alle Klassen anzeigen');
+ $('rows').replaceChildren();$('studentSelect').replaceChildren();$('eventSelect').replaceChildren();$('certificateStudent').replaceChildren();$('certificateClass').replaceChildren();$('internshipStudent').replaceChildren();$('internshipBlockClassFilter').replaceChildren();opt($('internshipBlockClassFilter'),'','Klasse auswählen');
  const classes=new Set();
  for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');opt($('internshipStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');classes.add(s.className)}
- for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))){opt($('certificateClass'),c,c);opt($('internshipBlockClass'),c,c);opt($('internshipBlockClassFilter'),c,c);}
+ for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))){opt($('certificateClass'),c,c);opt($('internshipBlockClassFilter'),c,c);}
  for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
 }
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
@@ -166,32 +165,24 @@ $('eventKind').onchange=()=>{
 };
 let internshipBlocks=[];
 let currentInternshipBlock=null;
-function filterInternshipBlocks(chooseId){
- const sel=$('internshipBlockSelect'),previous=String(chooseId||sel.value||'');
- const klass=$('internshipBlockClassFilter').value;
- const visible=internshipBlocks.filter(b=>!klass||b.className===klass);
- sel.replaceChildren();
- for(const b of visible)opt(sel,b.id,b.title+' · '+b.className+' · '+b.startsOn+' – '+b.endsOn+' ('+b.finalised+'/'+b.placements+' abgerechnet)');
- if(visible.some(b=>String(b.id)===previous))sel.value=previous;
- if(visible.length)return openInternshipBlock();
- $('internshipBlockRows').replaceChildren();
- currentInternshipBlock=null;
- $('internshipBlockSave').disabled=true;
- $('internshipBlockFinalise').disabled=true;
- $('internshipBlockNotice').textContent=klass?'Für Klasse '+klass+' sind noch keine Praktikumsblöcke vorhanden.':'Noch kein Praktikumsblock vorhanden.';
-}
 async function refreshInternshipBlocks(chooseId){
  internshipBlocks=await api('internship-blocks');
- await filterInternshipBlocks(chooseId);
+ const sel=$('internshipBlockSelect'),previous=String(chooseId||sel.value||'');
+ sel.replaceChildren();
+ for(const block of internshipBlocks)opt(sel,block.id,block.title+' · '+block.startsOn+' – '+block.endsOn+' ('+block.finalised+'/'+block.placements+' abgerechnet)');
+ if(internshipBlocks.some(block=>String(block.id)===previous))sel.value=previous;
+ await openInternshipBlock();
 }
 async function openInternshipBlock(){
  const id=$('internshipBlockSelect').value;
  const klass=$('internshipBlockClassFilter').value;
- currentInternshipBlock=internshipBlocks.find(b=>String(b.id)===id&&(!klass||b.className===klass));
+ currentInternshipBlock=internshipBlocks.find(b=>String(b.id)===id);
  $('internshipBlockRows').replaceChildren();
- if(!currentInternshipBlock)return;
+ $('internshipBlockSave').disabled=true;$('internshipBlockFinalise').disabled=true;
+ if(!currentInternshipBlock){$('internshipBlockNotice').textContent='Bitte einen Praktikumsblock auswählen.';return}
+ if(!klass){$('internshipBlockNotice').textContent='Bitte die Klasse auswählen, deren Schülerinnen und Schüler du bearbeiten möchtest.';return}
+ const rows=await api('internship-blocks/'+encodeURIComponent(id)+'/placements?className='+encodeURIComponent(klass));
  $('internshipBlockSave').disabled=false;
- const rows=await api('internship-blocks/'+encodeURIComponent(id)+'/placements');
  const endReached=currentInternshipBlock.endsOn<=new Date().toLocaleDateString('en-CA');
  for(const r of rows){
   const tr=document.createElement('tr');tr.dataset.placementId=r.placementId||'';tr.dataset.studentPk=r.studentPk;
@@ -216,11 +207,10 @@ $('internshipBlockForm').addEventListener('submit',async ev=>{
  try{
   const r=await api('internship-blocks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});
   $('internshipBlockNotice').textContent=r.message;
-  $('internshipBlockClassFilter').value=d.className;
   await refreshInternshipBlocks(r.id);
  }catch(e){$('internshipBlockNotice').textContent=e.message}
 });
-$('internshipBlockClassFilter').onchange=()=>filterInternshipBlocks().catch(e=>$('internshipBlockNotice').textContent=e.message);
+$('internshipBlockClassFilter').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
 $('internshipBlockReload').onclick=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
 $('internshipBlockSelect').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
 $('internshipBlockSave').onclick=async()=>{
