@@ -123,12 +123,12 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <p id="certificateStatus" role="status">Bitte eine Schülerin oder einen Schüler wählen.</p>
 <div style="display:flex;gap:10px;flex-wrap:wrap">
 <button id="certificatePdf" type="button" disabled>PDF herunterladen</button>
-<button id="certificateDocx" type="button" disabled>DOCX herunterladen</button>
+<button id="certificateDocx" type="button" disabled>ODT herunterladen</button>
 <button id="certificateNewVersion" type="button" disabled>Neue Zertifikatsversion erstellen (PDF)</button>
 </div>
 <hr>
 <h3>Klassenweise Zertifikate</h3>
-<p><small>ZIP mit Einzel-PDF, Einzel-DOCX und Sammel-PDF für berechtigte Personen. Noch nicht berechtigte Personen werden ausgelassen.</small></p>
+<p><small>ZIP mit Einzel-PDF, Einzel-ODT und Sammel-PDF für berechtigte Personen. Noch nicht berechtigte Personen werden ausgelassen.</small></p>
 <form onsubmit="return false"><label>Klasse <select id="certificateClass"></select></label>
 <button id="certificateZip" type="button">Klassen-ZIP herunterladen</button></form>
 <p id="certificateClassStatus" role="status"></p>
@@ -398,7 +398,7 @@ $('certificateCheck').onclick=certificateStatus;
 $('certificateStudent').onchange=certificateStatus;
 $('certificateDate').onchange=certificateStatus;
 $('certificatePdf').onclick=()=>certificateDownload('pdf');
-$('certificateDocx').onclick=()=>certificateDownload('docx');
+$('certificateDocx').onclick=()=>certificateDownload('odt');
 $('certificateNewVersion').onclick=()=>{
  const id=$('certificateStudent').value;
  if(!id || $('certificateNewVersion').disabled)return;
