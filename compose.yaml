@@ -25,8 +25,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?Bitte DB_PASSWORD in .env setzen}
       BSO_ADMIN_PASSWORD: ${ADMIN_INITIAL_PASSWORD:?Bitte ADMIN_INITIAL_PASSWORD in .env setzen}
       BSO_CERTIFICATE_TEMPLATE: /run/bso-private/BSO_Originalbriefkopf_bereinigt.docx
+      BSO_CERTIFICATE_ODT_TEMPLATE: /run/bso-private/BeispielZertifikat1.odt
     volumes:
       - ${BSO_CERTIFICATE_TEMPLATE_HOST:-/opt/bso-private/BSO_Originalbriefkopf_bereinigt.docx}:/run/bso-private/BSO_Originalbriefkopf_bereinigt.docx:ro
+      - ${BSO_CERTIFICATE_ODT_TEMPLATE_HOST:-/opt/bso-private/BeispielZertifikat1.odt}:/run/bso-private/BeispielZertifikat1.odt:ro
     ports:
       - "127.0.0.1:${BSO_PORT:-8081}:8080"
     networks: [private]
