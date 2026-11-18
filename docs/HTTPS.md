@@ -31,26 +31,30 @@ git pull --ff-only
 
 Bei lokalen Änderungen an `compose.yaml` erst prüfen und kontrolliert zusammenführen, nicht einfach überschreiben.
 
-## 3. HTTPS-Proxy starten
+## 3. Vorhandenen Nginx-Reverse-Proxy verwenden
 
-```bash
-docker compose -f compose.yaml -f deploy/compose.https.yaml up -d caddy
-docker compose -f compose.yaml -f deploy/compose.https.yaml ps
+Die laufende Umgebung verwendet den vorhandenen, von der Schul-IT verwalteten
+Nginx-Reverse-Proxy. Dieser Branch startet keinen Caddy und verändert keine
+Nginx-Konfiguration. Nginx muss intern ausschließlich auf den Loopback-Port des
+Webcontainers weiterleiten, zum Beispiel:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:8081;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_set_header X-Forwarded-Host $host;
+    proxy_set_header X-Forwarded-Port 443;
+}
 ```
 
-Caddy nutzt eine interne CA, generiert ein Zertifikat für **172.26.33.19** und erneuert es. Das Zertifikat ist zunächst **nicht** automatisch auf anderen Rechnern vertrauenswürdig. Referenz: https://caddyserver.com/docs/automatic-https
+## 4. Zertifikat und Vertrauensstellung
 
-## 4. Interne CA vertrauenswürdig verteilen
-
-Nur das **öffentliche** Root-Zertifikat exportieren:
-
-```bash
-docker compose -f compose.yaml -f deploy/compose.https.yaml cp \
-  caddy:/data/caddy/pki/authorities/local/root.crt \
-  ./bso-root-ca.crt
-```
-
-**Nicht** den privaten Schlüssel `root.key` exportieren oder verteilen. Die Schul-IT installiert `bso-root-ca.crt` auf den vorgesehenen Schul-PCs in den vertrauenswürdigen Stammzertifizierungsstellen (z. B. zentral über Gruppenrichtlinie), nachdem Fingerabdruck und Herkunft geprüft wurden. Geräte außerhalb dieses Vertrauenskreises zeigen eine Zertifikatswarnung. Diese Warnung nicht einfach wegklicken.
+Das TLS-Zertifikat und die Vertrauensstellung werden ausschließlich durch die
+Schul-IT am bestehenden Nginx verwaltet. Private Schlüssel bleiben dort und
+werden nicht in dieses Repository, in Compose-Variablen oder in Containerlogs
+übernommen. Ein Export aus einem Caddy-Container ist für diese Umgebung nicht
+vorgesehen.
 
 Prüfen: `https://172.26.33.19` auf einem Schul-PC mit installierter Root-CA. Das Vorhängeschloss sollte ohne Warnung erscheinen.
 
@@ -66,7 +70,7 @@ ports:
 Danach die Dienste ohne Volumelöschung neu erstellen:
 
 ```bash
-docker compose -f compose.yaml -f deploy/compose.https.yaml up -d --build
+docker compose up -d --build
 ```
 
 **Niemals** `docker compose down -v` ausführen: Das löscht Datenbankvolumes.

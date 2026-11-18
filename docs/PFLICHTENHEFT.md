@@ -44,12 +44,11 @@ Das System verwaltet BSO-Münzen, BSO-Veranstaltungen, Praktika, Pflichtveransta
 
 ### 2.4 Praktika
 
-- Pflichtpraktikum **Sek I:** einmal bis **100 Münzen**, 10 Münzen je anerkanntem Tag, maximal 10 Tage.
-- Pflichtpraktikum **Oberstufe:** unabhängig davon einmal bis **100 Münzen**, gleiche Bewertung.
+- Pflichtpraktika **Sek I und Oberstufe:** Mehrere eigenständige Pflichtpraktika sind **auch innerhalb desselben Schuljahres und Münzblocks** zulässig. Jedes einzelne Pflichtpraktikum bringt **10 Münzen je anerkanntem Tag**, maximal **100 Münzen je Praktikum** bei höchstens 10 Tagen. Frühere Häufigkeitssperren für Pflichtpraktika sind ausdrücklich aufgehoben (Änderung vom 04.11.2026).
 - Freiwilliges Zusatzpraktikum: **10 Münzen je anerkanntem Tag**, höchstens **50 Münzen pro Praktikum**; maximal **ein** anrechenbares freiwilliges Praktikum pro Schuljahr (damit max. 50 Münzen pro Schuljahr).
-- Bei Pflichtpraktika gilt die **erste endgültige Speicherung** der Münzen als Abrechnungsschluss; nachgeholte Tage werden anschließend nicht zusätzlich angerechnet. Fehlerhafte Eingaben dürfen über eine protokollierte Korrektur berichtigt werden.
+- Die **endgültige Speicherung eines konkreten Praktikums** schließt nur dessen Abrechnung ab. Weitere eigenständige Pflichtpraktika dürfen anschließend unabhängig davon erfasst und angerechnet werden. Fehlerhafte Eingaben dürfen über eine protokollierte Korrektur berichtigt werden.
 - Praktika werden mit Art, Betrieb, Zeitraum, anerkannten Tagen, Münzen und Schüler-/Schuljahr-/Blockzuordnung geführt. Auf Zertifikaten eigener Praktikumsabschnitt mit diesen Angaben für das aktuelle Schuljahr.
-- Die Prüfung verhindert doppelte Pflichtpraktikumsabrechnung je Block, Überschreiten von Obergrenzen sowie mehr als ein Zusatzpraktikum pro Schuljahr.
+- Die Prüfung verhindert die doppelte endgültige Abrechnung **desselben** Praktikums, Überschreiten der Höchstzahl an Tagen **je Praktikum** sowie mehr als ein anrechenbares freiwilliges Zusatzpraktikum pro Schuljahr. Keine generelle Häufigkeitssperre für Pflichtpraktika.
 - Die fachliche Abgrenzung von regulären Pflichtpraktika und einzelnen Schulbesuchsepisoden muss beim Klassenwechsel erhalten bleiben.
 
 ### 2.5 Pflichtveranstaltungsmonitoring

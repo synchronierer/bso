@@ -22,7 +22,7 @@ public class CsvImportController {
     private final JdbcTemplate db;
     CsvImportController(JdbcTemplate db){this.db=db;}
 
-    record CsvRequest(String csv){}
+    record CsvRequest(String csv, Boolean confirmHighValue){}
     record Preview(List<Map<String,Object>> rows,int added,int updated,int unchanged,int errors){}
     private record Row(String action, Map<String,Object> data, String error){}
 
@@ -63,11 +63,14 @@ public class CsvImportController {
     public Map<String,Object> importEvents(@RequestBody CsvRequest request){
         Preview p=preview(request,"events");
         if(p.errors()>0) throw bad("Import enthält Fehler; zuerst korrigieren");
+        if(p.rows().stream().anyMatch(row -> row.containsKey("warning")) && !Boolean.TRUE.equals(request.confirmHighValue()))
+            throw bad("Veranstaltungen über 20 Münzen benötigen eine ausdrückliche Bestätigung");
         int changed=0;
         for(Map<String,Object> r:p.rows()){
             if(!"ADD".equals(r.get("action")))continue;
-            db.update("INSERT INTO events(title,end_date,coins,kind) VALUES (?,CAST(? AS DATE),?,'WAHLPFLICHT')",
-                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")));
+            db.update("INSERT INTO events(title,end_date,coins,kind,required_for_grade,required_for_track) VALUES (?,CAST(? AS DATE),?,?,?,?)",
+                r.get("title"),r.get("endDate"),new BigDecimal((String)r.get("coins")),r.get("kind"),
+                r.get("requiredForGrade"),r.get("requiredForTrack"));
             changed++;
         }
         return Map.of("message","Veranstaltungsimport abgeschlossen","changed",changed);
@@ -126,10 +129,28 @@ public class CsvImportController {
                         if(coins.compareTo(new BigDecimal("0.5"))<0 || coins.remainder(new BigDecimal("0.5")).signum()!=0)
                             throw new IllegalArgumentException("Münzwert nur in 0,5er-Schritten ab 0,5");
                         if(coins.compareTo(new BigDecimal("20"))>0)
-                            throw new IllegalArgumentException("Über 20 Münzen: erst einzeln prüfen und bestätigen");
+                            row.put("warning","Über 20 Münzen – bestätigungspflichtig");
                         String key=title+"|"+end;
                         if(!keys.add(key))throw new IllegalArgumentException("Doppelte Veranstaltung in CSV");
-                        row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());
+                        String kind=EventKind.parse(field(record,"kind","Art","Veranstaltungsart"));
+                        String gradeText=optionalField(record,"requiredForGrade","PflichtJahrgang","Zieljahrgang","Jahrgang");
+                        String trackText=optionalField(record,"requiredForTrack","PflichtBildungsgang","Zielbildungsgang","Bildungsgang");
+                        Integer requiredForGrade=null;
+                        String requiredForTrack=null;
+                        if("PFLICHT".equals(kind)){
+                            if(gradeText.isBlank())throw new IllegalArgumentException("Bei P muss ein Zieljahrgang (7 bis 13) angegeben werden");
+                            requiredForGrade=Integer.valueOf(gradeText);
+                            if(requiredForGrade<7||requiredForGrade>13)throw new IllegalArgumentException("Zieljahrgang muss zwischen 7 und 13 liegen");
+                            if(!trackText.isBlank()){
+                                if(!Set.of("BR","V10","S1","Ü11","MSS").contains(trackText.toUpperCase(Locale.ROOT)))
+                                    throw new IllegalArgumentException("Zielbildungsgang ungültig");
+                                requiredForTrack=trackText.toUpperCase(Locale.ROOT);
+                            }
+                        }else if(!gradeText.isBlank()||!trackText.isBlank()){
+                            throw new IllegalArgumentException("Zieljahrgang und Zielbildungsgang nur für P verwenden");
+                        }
+                        row.put("title",title);row.put("endDate",end);row.put("coins",coins.toPlainString());row.put("kind",kind);
+                        row.put("requiredForGrade",requiredForGrade);row.put("requiredForTrack",requiredForTrack);
                         Integer n=db.queryForObject("SELECT COUNT(*) FROM events WHERE title=? AND end_date=CAST(? AS DATE)",
                              Integer.class,title,end);
                         action=(n!=null && n>0)?"UNCHANGED":"ADD";
@@ -159,6 +180,11 @@ public class CsvImportController {
             }
         }
         throw new IllegalArgumentException("Fehlende Spalte: "+names[0]);
+    }
+    private String optionalField(CSVRecord record,String...names){
+        for(String name:names) for(String header:record.getParser().getHeaderNames())
+            if(header.equalsIgnoreCase(name)) return record.get(header).trim();
+        return "";
     }
     private ResponseStatusException bad(String msg){
         return new ResponseStatusException(HttpStatus.BAD_REQUEST,msg);
