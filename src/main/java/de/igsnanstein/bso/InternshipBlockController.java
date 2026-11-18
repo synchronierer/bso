@@ -87,12 +87,12 @@ public class InternshipBlockController {
             WHERE p.block_id=? AND (?='' OR s.class_name=?)
             ORDER BY s.class_name,s.last_name,s.first_name,s.id
             """,id,filter,filter);
-        StringBuilder csv=new StringBuilder("\\uFEFFName;Klasse;Praktikumsbetrieb\\r\\n");
+        StringBuilder csv=new StringBuilder("\uFEFFName;Klasse;Praktikumsbetrieb\r\n");
         for(Map<String,Object> row:rows){
             String name=row.get("last_name")+", "+row.get("first_name");
             csv.append(csvCell(name)).append(';')
                .append(csvCell(String.valueOf(row.get("class_name")))).append(';')
-               .append(csvCell(String.valueOf(row.get("company")))).append("\\r\\n");
+               .append(csvCell(String.valueOf(row.get("company")))).append("\r\n");
         }
         return ResponseEntity.ok()
             .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=Praktikumsblock-"+id+".csv")
