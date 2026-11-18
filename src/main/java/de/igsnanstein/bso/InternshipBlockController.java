@@ -3,6 +3,10 @@ package de.igsnanstein.bso;
 import java.time.LocalDate;
 import java.util.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import java.nio.charset.StandardCharsets;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
@@ -68,6 +72,39 @@ public class InternshipBlockController {
             WHERE s.class_name=? AND s.active=true
             ORDER BY s.last_name,s.first_name,s.id
             """,id,className.trim());
+    }
+
+    /** Printable CSV roster of planned placements; never exports coin or account data. */
+    @GetMapping(value="/{id}/export.csv",produces="text/csv")
+    public ResponseEntity<byte[]> exportPlacements(@PathVariable long id,
+        @RequestParam(required=false) String className) {
+        block(id);
+        if(className!=null && className.length()>50)throw bad("Klassenfilter ungültig");
+        String filter=className==null?"":className.trim();
+        List<Map<String,Object>> rows=db.queryForList("""
+            SELECT s.last_name,s.first_name,s.class_name,p.company
+            FROM internship_placements p JOIN students s ON s.id=p.student_pk
+            WHERE p.block_id=? AND (?='' OR s.class_name=?)
+            ORDER BY s.class_name,s.last_name,s.first_name,s.id
+            """,id,filter,filter);
+        StringBuilder csv=new StringBuilder("\\uFEFFName;Klasse;Praktikumsbetrieb\\r\\n");
+        for(Map<String,Object> row:rows){
+            String name=row.get("last_name")+", "+row.get("first_name");
+            csv.append(csvCell(name)).append(';')
+               .append(csvCell(String.valueOf(row.get("class_name")))).append(';')
+               .append(csvCell(String.valueOf(row.get("company")))).append("\\r\\n");
+        }
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=Praktikumsblock-"+id+".csv")
+            .contentType(new MediaType("text","csv",StandardCharsets.UTF_8))
+            .body(csv.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String csvCell(String value) {
+        String safe=value==null?"":value;
+        // Prevent spreadsheet formula injection when opened in Excel.
+        if(!safe.isEmpty() && "=+-@".indexOf(safe.charAt(0))>=0)safe="'"+safe;
+        return "\"" + safe.replace("\"","\"\"") + "\"";
     }
 
     @PostMapping("/{id}/placements")
