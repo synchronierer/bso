@@ -59,6 +59,47 @@ public class InternshipBlockController {
         return Map.of("id",id,"message","Praktikumsblock gespeichert – noch keine Münzen vergeben");
     }
 
+    record UpdateBlock(String title,String startsOn,String endsOn) {}
+
+    @PatchMapping("/{id}")
+    @Transactional
+    public Map<String,Object> updateBlock(@PathVariable long id,@RequestBody UpdateBlock update,Authentication auth) {
+        db.queryForObject("SELECT id FROM internship_blocks WHERE id=? FOR UPDATE",Long.class,id);
+        Map<String,Object> old=block(id);
+        if(update==null||blank(update.title())||update.title().length()>200)
+            throw bad("Bezeichnung des Praktikumsblocks ungültig");
+        LocalDate start=parse(update.startsOn()),end=parse(update.endsOn());
+        if(end.isBefore(start))throw bad("Enddatum muss nach dem Anfang liegen");
+        Integer finalCount=db.queryForObject("""
+            SELECT COUNT(*) FROM internship_placements WHERE block_id=? AND internship_id IS NOT NULL
+            """,Integer.class,id);
+        boolean dateChange=!start.equals(((java.sql.Date)old.get("starts_on")).toLocalDate())
+            ||!end.equals(((java.sql.Date)old.get("ends_on")).toLocalDate());
+        if(finalCount!=null&&finalCount>0&&dateChange)
+            throw bad("Nach der ersten Münzvergabe darf der Praktikumszeitraum nicht mehr geändert werden");
+        db.update("UPDATE internship_blocks SET title=?,starts_on=?,ends_on=? WHERE id=?",
+            update.title().trim(),start,end,id);
+        audit(auth,"INTERNSHIP_BLOCK_UPDATE",id+"/"+old.get("title")+" -> "+update.title().trim());
+        return Map.of("message","Praktikumsblock aktualisiert");
+    }
+
+    @DeleteMapping("/{id}")
+    @Transactional
+    public Map<String,Object> deleteBlock(@PathVariable long id,Authentication auth) {
+        db.queryForObject("SELECT id FROM internship_blocks WHERE id=? FOR UPDATE",Long.class,id);
+        Map<String,Object> old=block(id);
+        Integer finalCount=db.queryForObject("""
+            SELECT COUNT(*) FROM internship_placements WHERE block_id=? AND internship_id IS NOT NULL
+            """,Integer.class,id);
+        if(finalCount!=null&&finalCount>0)
+            throw bad("Praktikumsblock mit endgültigen Münzbuchungen darf nicht gelöscht werden");
+        // Delete preliminary drafts only. Final coin records are never deleted here.
+        db.update("DELETE FROM internship_placements WHERE block_id=? AND internship_id IS NULL",id);
+        db.update("DELETE FROM internship_blocks WHERE id=?",id);
+        audit(auth,"INTERNSHIP_BLOCK_DELETE",id+"/"+old.get("title"));
+        return Map.of("message","Praktikumsblock und zugehörige Vorabzuordnungen gelöscht");
+    }
+
     @GetMapping("/{id}/placements")
     public List<Map<String,Object>> placements(@PathVariable long id,@RequestParam String className) {
         block(id);
