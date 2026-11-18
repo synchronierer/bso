@@ -44,7 +44,19 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <label id="eventGradeLabel" hidden>Pflicht für Jahrgang<select name="requiredForGrade" id="eventGrade"><option value="">Jahrgang wählen</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option></select></label>
 <label id="eventTrackLabel" hidden>Pflicht für Bildungsgang<select name="requiredForTrack"><option value="">Alle Bildungsgänge des Jahrgangs</option><option>ohne</option><option>KA</option><option>BR</option><option>V10</option><option>S1</option><option>Ü11</option><option>MSS</option></select></label>
 <button>Veranstaltung anlegen</button></form>
-<small>Für Praktika bitte die separate Praktikumserfassung verwenden (10 Münzen je anerkanntem Tag, maximal 100 im Pflichtpraktikum).</small></section>
+<small>Für Praktika bitte die separate Praktikumserfassung verwenden (10 Münzen je anerkanntem Tag, maximal 100 je Pflichtpraktikum).</small>
+<details style="margin-top:14px"><summary>Bestehende Veranstaltung bearbeiten oder löschen</summary>
+<form id="eventEditForm" onsubmit="return false">
+<label>Veranstaltung<select id="eventEditSelect"></select></label>
+<label>Name korrigieren<input id="eventEditTitle" maxlength="255" required></label>
+<label>Abschlussdatum<input id="eventEditDate" type="date" required></label>
+<label>Münzwert<input id="eventEditCoins" type="number" min="0.5" step="0.5" required></label>
+<button type="button" id="eventEditSave">Änderung speichern</button>
+<button type="button" id="eventEditDelete">Nicht verbuchte Veranstaltung löschen</button>
+</form>
+<p id="eventEditNotice" role="status"></p>
+<small>Bereits gebuchte Münzen bleiben historisch bestehen. Änderungen an solchen Veranstaltungen markieren betroffene Zertifikate zur erneuten Prüfung. Löschen ist nur ohne Münzbuchung möglich.</small>
+</details></section>
 <section><h2>Einzelne Münzvergabe (optional)</h2>
 <form id="grantForm"><label>Schüler<select name="studentPk" id="studentSelect" required></select></label>
 <label>Veranstaltung<select name="eventId" id="eventSelect" required></select></label>
@@ -64,8 +76,19 @@ label{display:flex;flex-direction:column;gap:4px;font-size:13px}small{color:#5d6
 <label>Vorhandenen Block öffnen<select id="internshipBlockSelect"></select></label>
 <label>Schüler nach Klasse filtern<select id="internshipBlockClassFilter" required></select></label>
 <button type="button" id="internshipBlockReload">Block öffnen</button>
+<button type="button" id="internshipBlockExport">CSV-Liste (Name, Klasse, Betrieb)</button>
 </form>
 <p>Praktikumsbetrieb aus dem <strong>Betriebskatalog</strong> auswählen. Neue Betriebe können unter <a href="/import.html">CSV-/Excel-Import → Praktikumsbetriebe</a> importiert werden.</p>
+<details><summary>Praktikumsblock umbenennen oder löschen</summary>
+<form id="internshipBlockEditForm" onsubmit="return false">
+<label>Bezeichnung<input id="internshipBlockEditTitle" maxlength="200" required></label>
+<label>Beginn<input type="date" id="internshipBlockEditStart" required></label>
+<label>Ende<input type="date" id="internshipBlockEditEnd" required></label>
+<button type="button" id="internshipBlockUpdate">Änderungen speichern</button>
+<button type="button" id="internshipBlockDelete">Block löschen</button>
+</form>
+<small>Nach einer Münzvergabe darf der Zeitraum nicht mehr verändert oder der Block gelöscht werden. Ohne endgültige Vergaben kann ein Block einschließlich seiner vorläufigen Betriebszuordnungen gelöscht werden.</small>
+</details>
 <p id="internshipBlockNotice" role="status"></p>
 <div style="overflow-x:auto"><table><thead><tr><th>Bestätigen</th><th>Schülerin / Schüler</th><th>Betrieb (vorab eintragen)</th><th>Anerkannte Tage (nach Abschluss)</th><th>Status</th></tr></thead><tbody id="internshipBlockRows"></tbody></table></div>
 <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -152,8 +175,45 @@ async function refresh(){
  for(const s of students){const tr=document.createElement('tr');[s.studentId,s.lastName,s.firstName,s.className,s.grade,s.track,s.coins].forEach(v=>cell(tr,v));$('rows').append(tr);opt($('studentSelect'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');opt($('certificateStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+', '+s.track+')');opt($('internshipStudent'),s.id,s.lastName+', '+s.firstName+' ('+s.className+')');classes.add(s.className)}
  for(const c of [...classes].sort((a,b)=>a.localeCompare(b,'de',{numeric:true}))){opt($('certificateClass'),c,c);opt($('internshipBlockClassFilter'),c,c);}
  if([...classes].includes(previousClassFilter))$('internshipBlockClassFilter').value=previousClassFilter;
- for(const e of events)opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
+ window.bsoEventList=events;
+ const oldEdit=$('eventEditSelect').value;
+ $('eventEditSelect').replaceChildren();
+ for(const e of events){
+  opt($('eventSelect'),e.id,e.title+' ('+e.coins+' Münzen)');
+  opt($('eventEditSelect'),e.id,e.title+' · '+e.endDate);
+ }
+ if(events.some(e=>String(e.id)===oldEdit))$('eventEditSelect').value=oldEdit;
+ fillEventEdit();
 }
+function fillEventEdit(){
+ const e=(window.bsoEventList||[]).find(e=>String(e.id)===$('eventEditSelect').value);
+ if(!e)return;
+ $('eventEditTitle').value=e.title;
+ $('eventEditDate').value=e.endDate;
+ $('eventEditCoins').value=e.coins;
+}
+$('eventEditSelect').onchange=fillEventEdit;
+$('eventEditSave').onclick=async()=>{
+ const id=$('eventEditSelect').value;if(!id)return;
+ const title=$('eventEditTitle').value.trim(),endDate=$('eventEditDate').value,coins=Number($('eventEditCoins').value);
+ if(!title||!endDate||!Number.isFinite(coins)||coins<0.5||Math.round(coins*2)!==coins*2){
+  $('eventEditNotice').textContent='Bitte die Angaben prüfen.';return;
+ }
+ if(!confirm('Veranstaltung ändern? Eventuell betroffene Zertifikate werden zur erneuten Prüfung markiert.'))return;
+ try{
+  const r=await api('events/'+encodeURIComponent(id),{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title,endDate,coins})});
+  await refresh();$('eventEditSelect').value=id;fillEventEdit();
+  $('eventEditNotice').textContent='Veranstaltung geändert. Betroffene Zertifikate prüfen.';
+ }catch(e){$('eventEditNotice').textContent=e.message}
+};
+$('eventEditDelete').onclick=async()=>{
+ const id=$('eventEditSelect').value;if(!id)return;
+ if(!confirm('Diese Veranstaltung endgültig löschen? Das ist nur möglich, wenn noch keine Münzen verbucht wurden.'))return;
+ try{
+  const r=await api('events/'+encodeURIComponent(id),{method:'DELETE'});
+  await refresh();$('eventEditNotice').textContent=r.message;
+ }catch(e){$('eventEditNotice').textContent=e.message}
+};
 function bind(id,url,prepare){$(id).addEventListener('submit',async ev=>{
  ev.preventDefault();const data=Object.fromEntries(new FormData(ev.target).entries());
  if(prepare && prepare(data)===false)return;
@@ -189,6 +249,11 @@ async function openInternshipBlock(){
  const klass=$('internshipBlockClassFilter').value;
  currentInternshipBlock=internshipBlocks.find(b=>String(b.id)===id);
  $('internshipBlockRows').replaceChildren();
+ if(currentInternshipBlock){
+  $('internshipBlockEditTitle').value=currentInternshipBlock.title;
+  $('internshipBlockEditStart').value=currentInternshipBlock.startsOn;
+  $('internshipBlockEditEnd').value=currentInternshipBlock.endsOn;
+ }
  $('internshipBlockSave').disabled=true;$('internshipBlockFinalise').disabled=true;
  if(!currentInternshipBlock){$('internshipBlockNotice').textContent='Bitte einen Praktikumsblock auswählen.';return}
  if(!klass){$('internshipBlockNotice').textContent='Bitte die Klasse auswählen, deren Schülerinnen und Schüler du bearbeiten möchtest.';return}
@@ -227,6 +292,30 @@ $('internshipBlockForm').addEventListener('submit',async ev=>{
  }catch(e){$('internshipBlockNotice').textContent=e.message}
 });
 $('internshipBlockClassFilter').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
+$('internshipBlockExport').onclick=()=>{
+ if(!currentInternshipBlock){$('internshipBlockNotice').textContent='Bitte einen Praktikumsblock auswählen.';return}
+ const klass=$('internshipBlockClassFilter').value;
+ const url='/api/internship-blocks/'+encodeURIComponent(currentInternshipBlock.id)+'/export.csv'+(klass?'?className='+encodeURIComponent(klass):'');
+ location.href=url;
+};
+$('internshipBlockUpdate').onclick=async()=>{
+ if(!currentInternshipBlock)return;
+ const id=currentInternshipBlock.id;
+ const payload={title:$('internshipBlockEditTitle').value,startsOn:$('internshipBlockEditStart').value,endsOn:$('internshipBlockEditEnd').value};
+ try{
+  const r=await api('internship-blocks/'+id,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  await refreshInternshipBlocks(id);$('internshipBlockNotice').textContent=r.message;
+ }catch(e){$('internshipBlockNotice').textContent=e.message}
+};
+$('internshipBlockDelete').onclick=async()=>{
+ if(!currentInternshipBlock)return;
+ const id=currentInternshipBlock.id;
+ if(!confirm('Den Praktikumsblock und alle noch nicht endgültig verbuchten Betriebszuordnungen unwiderruflich löschen? Bereits endgültige Münzvergaben verhindern die Löschung.'))return;
+ try{
+  const r=await api('internship-blocks/'+id,{method:'DELETE'});
+  await refreshInternshipBlocks();$('internshipBlockNotice').textContent=r.message;
+ }catch(e){$('internshipBlockNotice').textContent=e.message}
+};
 $('internshipBlockReload').onclick=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
 $('internshipBlockSelect').onchange=()=>openInternshipBlock().catch(e=>$('internshipBlockNotice').textContent=e.message);
 $('internshipBlockSave').onclick=async()=>{
