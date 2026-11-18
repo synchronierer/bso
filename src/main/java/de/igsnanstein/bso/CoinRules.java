@@ -8,17 +8,19 @@ import java.util.Objects;
 /** Deterministic, exact BSO rules shared by HTTP services and tests. */
 public final class CoinRules {
     private static final BigDecimal HALF = new BigDecimal("0.5");
+    // Binding values from "BSO Veranstaltungen und Münzen 202627.xlsx", Tabelle1, rows 25–27.
     private static final Map<String, Thresholds> THRESHOLDS = Map.ofEntries(
-        Map.entry("8|BR", new Thresholds("11", "18", "22")),
-        Map.entry("8|V10/S1/Ü11", new Thresholds("10", "17", "21")),
-        Map.entry("9|BR", new Thresholds("128", "151", "171")),
-        Map.entry("9|V10/S1/Ü11", new Thresholds("24", "47", "67")),
-        Map.entry("10|S1/Ü11", new Thresholds("40", "70", "97")),
-        Map.entry("10|V10/S1/Ü11", new Thresholds("40", "70", "97")),
-        Map.entry("10|S1", new Thresholds("40", "70", "97")),
-        Map.entry("10|Ü11", new Thresholds("40", "70", "97")),
-        Map.entry("11|MSS", new Thresholds("116", "137", "153")),
-        Map.entry("12|MSS", new Thresholds("132", "160", "183"))
+        Map.entry("8|OHNE", new Thresholds("10","17","22")),
+        Map.entry("9|KA", new Thresholds("119","126","133")),
+        Map.entry("9|BR", new Thresholds("119","126","133")),
+        Map.entry("9|V10", new Thresholds("16","23","30")),
+        Map.entry("9|S1", new Thresholds("16","23","30")),
+        Map.entry("9|Ü11", new Thresholds("16","23","30")),
+        Map.entry("10|BR", new Thresholds("18","25","32")),
+        Map.entry("10|S1", new Thresholds("18","25","32")),
+        Map.entry("10|Ü11", new Thresholds("118","125","132")),
+        Map.entry("11|OHNE", new Thresholds("118","125","132")),
+        Map.entry("12|OHNE", new Thresholds("17","24","31"))
     );
 
     private CoinRules() {}
@@ -60,11 +62,9 @@ public final class CoinRules {
     }
 
     private static String normalizedTrack(String track) {
-        if (track == null) return "";
-        return switch (track.trim().toUpperCase()) {
-            case "V10", "S1", "Ü11", "U11", "V10/S1", "V10/S1/U11" -> "V10/S1/Ü11";
-            default -> track.trim();
-        };
+        if(track==null)return "";
+        String value=track.trim().toUpperCase(java.util.Locale.ROOT);
+        return "U11".equals(value)?"Ü11":value;
     }
 
     public enum Block { SEK_I, OBERSTUFE }
