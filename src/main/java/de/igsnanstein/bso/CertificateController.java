@@ -33,10 +33,10 @@ public class CertificateController {
         CertificateService.Generated generated=certificates.issue(studentPk,date(asOf),auth.getName(),newVersion);
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=BSO-Zertifikat-"+studentPk+".pdf").body(generated.pdf());
     }
-    @GetMapping(value="/{studentPk}/docx",produces="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-    public ResponseEntity<byte[]> docx(@PathVariable long studentPk,@RequestParam(defaultValue="") String asOf,@RequestParam(defaultValue="false") boolean newVersion,Authentication auth){
+    @GetMapping(value="/{studentPk}/odt",produces="application/vnd.oasis.opendocument.text")
+    public ResponseEntity<byte[]> odt(@PathVariable long studentPk,@RequestParam(defaultValue="") String asOf,@RequestParam(defaultValue="false") boolean newVersion,Authentication auth){
         CertificateService.Generated generated=certificates.issue(studentPk,date(asOf),auth.getName(),newVersion);
-        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=BSO-Zertifikat-"+studentPk+".docx").body(generated.docx());
+        return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,"attachment; filename=BSO-Zertifikat-"+studentPk+".odt").body(generated.odt());
     }
     @GetMapping(value="/class/{className}.zip",produces="application/zip")
     public ResponseEntity<byte[]> classZip(@PathVariable String className,@RequestParam(defaultValue="") String asOf,@RequestParam(defaultValue="false") boolean onlyValid,Authentication auth){
@@ -46,7 +46,7 @@ public class CertificateController {
             for(Map<String,Object> student:students) try {
                 CertificateService.Generated generated=certificates.issue(((Number)student.get("id")).longValue(),date,auth.getName(),false);
                 String base=student.get("last_name")+"_"+student.get("first_name")+"_"+student.get("id");
-                add(zip,base+".pdf",generated.pdf()); add(zip,base+".docx",generated.docx()); pdfs.add(generated.pdf());pdfNames.add(base+".pdf");
+                add(zip,base+".pdf",generated.pdf()); add(zip,base+".odt",generated.docx()); pdfs.add(generated.pdf());pdfNames.add(base+".pdf");
             } catch(IllegalArgumentException ex) { if(!onlyValid) throw ex; }
             if(!pdfs.isEmpty()) { ByteArrayOutputStream merged=new ByteArrayOutputStream(); PDFMergerUtility merger=new PDFMergerUtility(); for(byte[] pdf:pdfs) merger.addSource(new RandomAccessReadBuffer(pdf)); merger.setDestinationStream(merged); merger.mergeDocuments(null); add(zip,"Sammelausgabe.pdf",merged.toByteArray()); }
         } catch(Exception ex) { throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"Sammelausgabe konnte nicht erstellt werden",ex); }
