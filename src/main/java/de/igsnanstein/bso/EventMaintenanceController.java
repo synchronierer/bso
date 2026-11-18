@@ -26,6 +26,23 @@ public class EventMaintenanceController {
         return Map.of("eventId",eventId,"status","KORRIGIERT","certificatesMarked",true);
     }
 
+    @DeleteMapping("/{eventId}")
+    @Transactional
+    public Map<String,Object> delete(@PathVariable long eventId,Authentication auth) {
+        Map<String,Object> old=event(eventId);
+        Integer bookings=db.queryForObject("SELECT COUNT(*) FROM coin_grants WHERE event_id=?",Integer.class,eventId);
+        if(bookings!=null&&bookings>0)
+            throw bad("Veranstaltung hat bereits Münzbuchungen und darf nicht gelöscht werden. Bitte stattdessen korrigieren oder absagen.");
+        db.update("DELETE FROM roster_drafts WHERE event_id=?",eventId);
+        db.update("DELETE FROM event_equivalences WHERE event_id=?",eventId);
+        db.update("DELETE FROM events WHERE id=?",eventId);
+        db.update("""
+            INSERT INTO audit_events(actor,action,object_type,object_id,before_json,after_json)
+            VALUES (?, 'EVENT_DELETE', 'event', ?,CAST(? AS JSONB),CAST('null' AS JSONB))
+            """,auth.getName(),Long.toString(eventId),quote(old.toString()));
+        return Map.of("message","Nicht verbuchte Veranstaltung gelöscht");
+    }
+
     @PatchMapping("/{eventId}/status") @Transactional
     public Map<String,Object> status(@PathVariable long eventId,@RequestParam String value,Authentication auth) {
         Map<String,Object> old=event(eventId);
